@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">לוח הספירלה</string>
+    <string name="title_activity_main">לוח הספירלה</string>
+    <string name="package_name">com.spiraldiary.app</string>
+    <string name="custom_url_scheme">com.spiraldiary.app</string>
+</resources>
