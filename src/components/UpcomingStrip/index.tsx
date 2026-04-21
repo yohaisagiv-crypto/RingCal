@@ -42,11 +42,10 @@ export default function UpcomingStrip({ onTap }: Props) {
     return () => clearInterval(id)
   }, [])
 
-  const todayStart = new Date()
-  todayStart.setHours(0, 0, 0, 0)
+  const todayStr = new Date().toISOString().slice(0, 10)
 
   const upcoming = events
-    .filter(e => !e.done && new Date(e.date + 'T00:00:00') >= todayStart)
+    .filter(e => !e.done && e.date >= todayStr)
     .sort((a, b) => {
       const da = a.date + (a.time ?? '00:00')
       const db = b.date + (b.time ?? '00:00')
