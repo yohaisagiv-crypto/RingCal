@@ -4,6 +4,7 @@ import NeedleBar from '../NeedleBar'
 import CategoryStrip from '../CategoryStrip'
 import SpiralCanvas from '../SpiralCanvas'
 import EventSheet from '../EventSheet'
+import UpcomingStrip from '../UpcomingStrip'
 import { useAppStore } from '../../store/useAppStore'
 import { useLang } from '../../hooks/useLang'
 import type { CalendarEvent } from '../../types'
@@ -58,6 +59,7 @@ export default function SpiralScreen({ onNavigate }: Props) {
       <TopBar />
       <NeedleBar onMenu={() => setShowMenu(true)} onSearch={() => setShowSearch(true)} />
       <CategoryStrip />
+      <UpcomingStrip onTap={(ev) => { setSheetEvent(ev); setAddDate(null) }} />
       <SpiralCanvas
         onTapEmpty={(d) => { setAddDate(d); setSheetEvent(null) }}
         onTapEvent={(ev) => { setSheetEvent(ev); setAddDate(null) }}
