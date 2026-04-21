@@ -40,7 +40,7 @@ export default function SpiralCanvas({ onTapEmpty, onTapEvent }: Props) {
     const S = W / 570
 
     const R_IN = 75 * S
-    const R_OUT = 278 * S
+    const R_OUT = 284 * S
     const OUTER_W = 14 * S
     const R_CAT_OUT = R_OUT - OUTER_W
 
@@ -170,7 +170,7 @@ export default function SpiralCanvas({ onTapEmpty, onTapEvent }: Props) {
     if (!canvas) return
     const wrap = canvas.parentElement!
     const resize = () => {
-      const size = Math.min(wrap.clientWidth, wrap.clientHeight) * 0.97
+      const size = wrap.clientWidth
       canvas.width = size
       canvas.height = size
       draw()
@@ -625,19 +625,19 @@ function drawCriticalArc(
   ctx.arc(CX, CY, R_CAT_OUT, startA, endA)
   ctx.arc(CX, CY, R_IN, endA, startA, true)
   ctx.closePath()
-  ctx.fillStyle = 'rgba(231,76,60,.22)'
+  ctx.fillStyle = 'rgba(231,76,60,.32)'
   ctx.fill()
   // Outer border
   ctx.beginPath()
   ctx.arc(CX, CY, R_CAT_OUT, startA, endA)
-  ctx.strokeStyle = 'rgba(231,76,60,.85)'
-  ctx.lineWidth = 2.5 * S
+  ctx.strokeStyle = 'rgba(231,76,60,.95)'
+  ctx.lineWidth = 3 * S
   ctx.stroke()
   // Inner border
   ctx.beginPath()
   ctx.arc(CX, CY, R_IN, startA, endA)
-  ctx.strokeStyle = 'rgba(231,76,60,.5)'
-  ctx.lineWidth = 1.5 * S
+  ctx.strokeStyle = 'rgba(231,76,60,.7)'
+  ctx.lineWidth = 2 * S
   ctx.stroke()
   // Side lines (start and end of arc)
   const pOutStart = pxy(startA, R_CAT_OUT, CX, CY)
