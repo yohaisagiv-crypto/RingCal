@@ -1,0 +1,67 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0D1B4B"/>
+      <stop offset="100%" stop-color="#0A1128"/>
+    </linearGradient>
+    <filter id="glow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="4" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="needleGlow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="6" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="512" height="512" rx="108" fill="url(#bg)"/>
+
+  <!-- Subtle outer boundary -->
+  <circle cx="256" cy="256" r="218" fill="none" stroke="white" stroke-width="1.5" opacity="0.12"/>
+
+  <!-- Ring 1 — outer — blue (עבודה) -->
+  <circle cx="256" cy="256" r="196" fill="none" stroke="#4285F4" stroke-width="26" opacity="0.95"/>
+
+  <!-- Ring 2 — purple (לימודים) -->
+  <circle cx="256" cy="256" r="158" fill="none" stroke="#AB47BC" stroke-width="24" opacity="0.95"/>
+
+  <!-- Ring 3 — red/coral (חגים) -->
+  <circle cx="256" cy="256" r="123" fill="none" stroke="#EF5350" stroke-width="22" opacity="0.95"/>
+
+  <!-- Ring 4 — inner — green (אישי) -->
+  <circle cx="256" cy="256" r="90" fill="none" stroke="#66BB6A" stroke-width="20" opacity="0.95"/>
+
+  <!-- Inner fill (dark center) -->
+  <circle cx="256" cy="256" r="68" fill="#0D1B4B"/>
+  <circle cx="256" cy="256" r="68" fill="black" opacity="0.35"/>
+
+  <!-- 12 o'clock tick -->
+  <line x1="256" y1="32" x2="256" y2="52" stroke="white" stroke-width="5" stroke-linecap="round" opacity="0.5"/>
+  <!-- 3 o'clock tick -->
+  <line x1="480" y1="256" x2="460" y2="256" stroke="white" stroke-width="4" stroke-linecap="round" opacity="0.3"/>
+  <!-- 6 o'clock tick -->
+  <line x1="256" y1="480" x2="256" y2="460" stroke="white" stroke-width="4" stroke-linecap="round" opacity="0.3"/>
+  <!-- 9 o'clock tick -->
+  <line x1="32" y1="256" x2="52" y2="256" stroke="white" stroke-width="4" stroke-linecap="round" opacity="0.3"/>
+
+  <!--
+    Red needle at ~1:50 position (55° clockwise from 12)
+    tip x = 256 + 210 * sin(55°) = 256 + 172 = 428
+    tip y = 256 - 210 * cos(55°) = 256 - 120 = 136
+  -->
+
+  <!-- Needle glow -->
+  <line x1="256" y1="256" x2="428" y2="136" stroke="#FF1744" stroke-width="12" stroke-linecap="round" opacity="0.25" filter="url(#needleGlow)"/>
+
+  <!-- Needle -->
+  <line x1="256" y1="256" x2="428" y2="136" stroke="#FF1744" stroke-width="7" stroke-linecap="round"/>
+
+  <!-- Needle tip dot -->
+  <circle cx="428" cy="136" r="11" fill="#FF1744" filter="url(#glow)"/>
+  <circle cx="428" cy="136" r="7" fill="#FF6B6B"/>
+
+  <!-- Center dot -->
+  <circle cx="256" cy="256" r="10" fill="white" opacity="0.9"/>
+  <circle cx="256" cy="256" r="5" fill="#FF1744"/>
+</svg>

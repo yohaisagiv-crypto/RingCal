@@ -29,7 +29,7 @@ export default function SpiralScreen({ onNavigate }: Props) {
   const pullFromGcal = async () => {
     if (!gcalConnected || !gcal.isConnected()) return
     try {
-      const since = new Date(new Date().getFullYear(), 0, 1)
+      const since = new Date(new Date().getFullYear() - 3, 0, 1)
       const gcalEvents = await gcal.fetchFutureEvents(since)
       const existingIds = new Set(events.map(e => e.gcalId).filter(Boolean))
       for (const ge of gcalEvents) {

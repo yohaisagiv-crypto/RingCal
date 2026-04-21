@@ -131,10 +131,23 @@ export type GcalEventRaw = {
 }
 
 export async function fetchFutureEvents(since: Date): Promise<GcalEventRaw[]> {
-  const data = await apiFetch(
-    `/calendars/primary/events?timeMin=${encodeURIComponent(since.toISOString())}&singleEvents=true&orderBy=startTime&maxResults=500`
-  ) as { items?: GcalEventRaw[] }
-  return (data?.items ?? []).filter(e => e.status !== 'cancelled')
+  const all: GcalEventRaw[] = []
+  let pageToken: string | undefined
+
+  do {
+    const params = new URLSearchParams({
+      timeMin: since.toISOString(),
+      singleEvents: 'true',
+      orderBy: 'startTime',
+      maxResults: '1000',
+      ...(pageToken ? { pageToken } : {}),
+    })
+    const data = await apiFetch(`/calendars/primary/events?${params}`) as { items?: GcalEventRaw[]; nextPageToken?: string }
+    all.push(...(data?.items ?? []).filter(e => e.status !== 'cancelled'))
+    pageToken = data?.nextPageToken
+  } while (pageToken)
+
+  return all
 }
 
 export async function createEvent(ev: {

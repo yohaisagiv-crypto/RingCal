@@ -1,0 +1,90 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 500" width="1024" height="500">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0D1B4B"/>
+      <stop offset="60%" stop-color="#0A1535"/>
+      <stop offset="100%" stop-color="#060D20"/>
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="5" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <clipPath id="right-half">
+      <rect x="540" y="0" width="484" height="500"/>
+    </clipPath>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1024" height="500" fill="url(#bg)"/>
+
+  <!-- Rings (right side, partially clipped) -->
+  <g clip-path="url(#right-half)">
+    <circle cx="760" cy="250" r="226" fill="none" stroke="white" stroke-width="1.5" opacity="0.08"/>
+    <circle cx="760" cy="250" r="200" fill="none" stroke="#4285F4" stroke-width="30" opacity="0.85"/>
+    <circle cx="760" cy="250" r="160" fill="none" stroke="#AB47BC" stroke-width="26" opacity="0.85"/>
+    <circle cx="760" cy="250" r="123" fill="none" stroke="#EF5350" stroke-width="24" opacity="0.85"/>
+    <circle cx="760" cy="250" r="88"  fill="none" stroke="#66BB6A" stroke-width="22" opacity="0.85"/>
+    <circle cx="760" cy="250" r="56"  fill="#060D20" opacity="0.8"/>
+
+    <!-- Needle glow -->
+    <line x1="760" y1="250" x2="900" y2="95" stroke="#FF1744" stroke-width="14" stroke-linecap="round" opacity="0.2" filter="url(#glow)"/>
+    <!-- Needle -->
+    <line x1="760" y1="250" x2="900" y2="95" stroke="#FF1744" stroke-width="7" stroke-linecap="round"/>
+    <circle cx="900" cy="95" r="11" fill="#FF1744" filter="url(#glow)"/>
+    <circle cx="900" cy="95" r="7"  fill="#FF6B6B"/>
+    <!-- Center dot -->
+    <circle cx="760" cy="250" r="9" fill="white" opacity="0.9"/>
+    <circle cx="760" cy="250" r="4" fill="#FF1744"/>
+
+    <!-- Tick marks -->
+    <line x1="760" y1="22" x2="760" y2="42" stroke="white" stroke-width="4" stroke-linecap="round" opacity="0.4"/>
+    <line x1="986" y1="250" x2="966" y2="250" stroke="white" stroke-width="3" stroke-linecap="round" opacity="0.25"/>
+    <line x1="760" y1="478" x2="760" y2="458" stroke="white" stroke-width="3" stroke-linecap="round" opacity="0.25"/>
+  </g>
+
+  <!-- Divider line -->
+  <line x1="560" y1="60" x2="560" y2="440" stroke="white" stroke-width="1" opacity="0.06"/>
+
+  <!-- App name -->
+  <text x="68" y="220"
+    font-family="'SF Pro Display', 'Helvetica Neue', Arial, sans-serif"
+    font-size="100" font-weight="800" fill="white" letter-spacing="-3" opacity="0.97">
+    RingCal
+  </text>
+
+  <!-- Colored underline accent -->
+  <rect x="68" y="234" width="340" height="5" rx="2.5" fill="url(#bg)" opacity="0"/>
+  <rect x="68" y="238" width="80" height="5" rx="2.5" fill="#4285F4"/>
+  <rect x="156" y="238" width="60" height="5" rx="2.5" fill="#AB47BC"/>
+  <rect x="224" y="238" width="60" height="5" rx="2.5" fill="#EF5350"/>
+  <rect x="292" y="238" width="60" height="5" rx="2.5" fill="#66BB6A"/>
+
+  <!-- Tagline Hebrew -->
+  <text x="70" y="298"
+    font-family="'SF Pro', 'Helvetica Neue', Arial, sans-serif"
+    font-size="28" font-weight="400" fill="white" opacity="0.65">
+    הזמן נראה אחרת לגמרי
+  </text>
+
+  <!-- Tagline English -->
+  <text x="70" y="340"
+    font-family="'SF Pro', 'Helvetica Neue', Arial, sans-serif"
+    font-size="22" font-weight="300" fill="white" opacity="0.38" letter-spacing="0.5">
+    Your calendar, reimagined as rings of time
+  </text>
+
+  <!-- Category pills -->
+  <g transform="translate(70, 375)">
+    <rect width="72" height="22" rx="11" fill="#4285F4" opacity="0.25"/>
+    <text x="36" y="15" text-anchor="middle" font-family="Arial" font-size="11" font-weight="600" fill="#4285F4">עבודה</text>
+
+    <rect x="82" width="82" height="22" rx="11" fill="#AB47BC" opacity="0.25"/>
+    <text x="123" y="15" text-anchor="middle" font-family="Arial" font-size="11" font-weight="600" fill="#AB47BC">לימודים</text>
+
+    <rect x="174" width="62" height="22" rx="11" fill="#EF5350" opacity="0.25"/>
+    <text x="205" y="15" text-anchor="middle" font-family="Arial" font-size="11" font-weight="600" fill="#EF5350">חגים</text>
+
+    <rect x="246" width="52" height="22" rx="11" fill="#66BB6A" opacity="0.25"/>
+    <text x="272" y="15" text-anchor="middle" font-family="Arial" font-size="11" font-weight="600" fill="#66BB6A">אישי</text>
+  </g>
+</svg>
