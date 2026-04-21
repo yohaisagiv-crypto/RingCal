@@ -170,9 +170,11 @@ export default function SpiralCanvas({ onTapEmpty, onTapEvent }: Props) {
     if (!canvas) return
     const wrap = canvas.parentElement!
     const resize = () => {
-      const size = Math.min(wrap.clientWidth, wrap.clientHeight)
+      const size = Math.min(wrap.offsetWidth, wrap.offsetHeight)
       canvas.width = size
       canvas.height = size
+      canvas.style.width = size + 'px'
+      canvas.style.height = size + 'px'
       draw()
     }
     const ro = new ResizeObserver(resize)
@@ -301,20 +303,16 @@ export default function SpiralCanvas({ onTapEmpty, onTapEvent }: Props) {
   }, [mode, viewDate, needle, events, categories, year, month, onTapEvent, onTapEmpty, setNeedle])
 
   return (
-    <div className="flex-1 relative bg-[#f5f5f7] overflow-hidden">
+    <div
+      className="flex-1 overflow-hidden bg-[#f5f5f7]"
+      style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', direction: 'ltr' }}
+    >
       <canvas
         ref={canvasRef}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
-        style={{
-          position: 'absolute',
-          top: '50%',
-          left: '50%',
-          transform: 'translate(-50%, -50%)',
-          touchAction: 'none',
-          cursor: 'pointer',
-        }}
+        style={{ display: 'block', touchAction: 'none', cursor: 'pointer' }}
       />
     </div>
   )
