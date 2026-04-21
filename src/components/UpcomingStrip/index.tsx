@@ -53,8 +53,6 @@ export default function UpcomingStrip({ onTap }: Props) {
     })
     .slice(0, 25)
 
-  if (upcoming.length === 0) return null
-
   const catMap = Object.fromEntries(categories.map(c => [c.id, c]))
 
   return (
@@ -63,6 +61,11 @@ export default function UpcomingStrip({ onTap }: Props) {
       dir={rtl ? 'rtl' : 'ltr'}
       style={{ WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none', msOverflowStyle: 'none' }}
     >
+      {upcoming.length === 0 && (
+        <span className="text-[10px] text-gray-300 font-medium px-1 py-0.5">
+          {rtl ? 'אין אירועים קרובים' : 'No upcoming events'}
+        </span>
+      )}
       {upcoming.map(ev => {
         const cat = catMap[ev.categoryId]
         const color = cat?.color ?? '#888'
