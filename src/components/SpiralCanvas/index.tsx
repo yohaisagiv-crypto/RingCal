@@ -305,14 +305,21 @@ export default function SpiralCanvas({ onTapEmpty, onTapEvent }: Props) {
   return (
     <div
       className="flex-1 overflow-hidden bg-[#f5f5f7]"
-      style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', direction: 'ltr' }}
+      style={{ position: 'relative' }}
     >
       <canvas
         ref={canvasRef}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
-        style={{ display: 'block', touchAction: 'none', cursor: 'pointer' }}
+        style={{
+          display: 'block',
+          position: 'absolute',
+          top: 0, bottom: 0, left: 0, right: 0,
+          margin: 'auto',
+          touchAction: 'none',
+          cursor: 'pointer',
+        }}
       />
     </div>
   )
