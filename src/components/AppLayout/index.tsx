@@ -44,15 +44,17 @@ export default function AppLayout() {
         </div>
       </div>
 
-      <div className="flex-shrink-0 flex items-center justify-center gap-2 py-2 bg-white border-t border-gray-100">
+      <div className="flex-shrink-0 flex items-center justify-center gap-6 py-3 bg-white border-t border-gray-100">
         {[0, 1, 2].map(i => (
           <button
             key={i}
             onClick={() => setPage(i)}
-            className={`rounded-full transition-all duration-200 ${
-              page === i ? 'w-6 h-2.5 bg-blue-500' : 'w-2.5 h-2.5 bg-gray-200'
-            }`}
-          />
+            className="p-3 flex items-center justify-center"
+          >
+            <span className={`rounded-full transition-all duration-200 block ${
+              page === i ? 'w-7 h-3 bg-blue-500' : 'w-3 h-3 bg-gray-300'
+            }`} />
+          </button>
         ))}
       </div>
     </div>
