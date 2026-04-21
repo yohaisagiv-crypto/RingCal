@@ -21,11 +21,14 @@ export default function SpiralCanvas({ onTapEmpty, onTapEvent }: Props) {
   const isDragging = useRef(false)
   const dragStart = useRef<{ x: number; y: number } | null>(null)
 
-  // Pinch-to-zoom state
+  // Pinch-to-zoom + pan state
   const zoom = useRef(1)
+  const panOffset = useRef<{ x: number; y: number }>({ x: 0, y: 0 })
   const activePointers = useRef<Map<number, { x: number; y: number }>>(new Map())
   const pinchStartDist = useRef<number | null>(null)
   const pinchStartZoom = useRef(1)
+  const pinchStartPan = useRef<{ x: number; y: number }>({ x: 0, y: 0 })
+  const pinchStartMid = useRef<{ x: number; y: number }>({ x: 0, y: 0 })
 
   const draw = useCallback(() => {
     const canvas = canvasRef.current
@@ -73,9 +76,9 @@ export default function SpiralCanvas({ onTapEmpty, onTapEvent }: Props) {
     ctx.fillStyle = '#f8f8fc'
     ctx.fillRect(0, 0, W, H)
 
-    // ── Zoom ──
+    // ── Zoom + Pan ──
     ctx.save()
-    ctx.translate(CX, CY)
+    ctx.translate(CX + panOffset.current.x, CY + panOffset.current.y)
     ctx.scale(zoom.current, zoom.current)
     ctx.translate(-CX, -CY)
 
@@ -201,22 +204,33 @@ export default function SpiralCanvas({ onTapEmpty, onTapEvent }: Props) {
   }, [draw])
 
   // ── Pointer helpers ──
-  const getAngleFromPointer = useCallback((clientX: number, clientY: number): number | null => {
+  const canvasToWorld = useCallback((clientX: number, clientY: number) => {
     const canvas = canvasRef.current
     if (!canvas) return null
     const rect = canvas.getBoundingClientRect()
-    const x = (clientX - rect.left) * (canvas.width / rect.width)
-    const y = (clientY - rect.top) * (canvas.height / rect.height)
+    const scale = canvas.width / rect.width
+    // screen → canvas pixels
+    const cx = (clientX - rect.left) * scale
+    const cy = (clientY - rect.top) * scale
     const CX = canvas.width / 2
     const CY = canvas.height / 2
-    const S = canvas.width / 570
+    // undo pan+zoom transform
+    const x = (cx - CX - panOffset.current.x) / zoom.current + CX
+    const y = (cy - CY - panOffset.current.y) / zoom.current + CY
+    return { x, y, CX, CY, S: canvas.width / 570 }
+  }, [])
+
+  const getAngleFromPointer = useCallback((clientX: number, clientY: number): number | null => {
+    const w = canvasToWorld(clientX, clientY)
+    if (!w) return null
+    const { x, y, CX, CY, S } = w
     const dx = x - CX, dy = y - CY
     const dist = Math.sqrt(dx * dx + dy * dy)
     if (dist < 75 * S * 0.4 || dist > 278 * S * 1.05) return null
     let a = Math.atan2(dy, dx) + Math.PI / 2
     if (a < 0) a += Math.PI * 2
     return a / (Math.PI * 2)
-  }, [])
+  }, [canvasToWorld])
 
   const onPointerDown = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
     activePointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
@@ -229,6 +243,8 @@ export default function SpiralCanvas({ onTapEmpty, onTapEvent }: Props) {
       const dx = pts[1].x - pts[0].x, dy = pts[1].y - pts[0].y
       pinchStartDist.current = Math.sqrt(dx * dx + dy * dy)
       pinchStartZoom.current = zoom.current
+      pinchStartPan.current = { ...panOffset.current }
+      pinchStartMid.current = { x: (pts[0].x + pts[1].x) / 2, y: (pts[0].y + pts[1].y) / 2 }
       isDragging.current = false
       dragStart.current = null
     }
@@ -239,11 +255,25 @@ export default function SpiralCanvas({ onTapEmpty, onTapEvent }: Props) {
     activePointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
 
     if (activePointers.current.size === 2 && pinchStartDist.current !== null) {
-      // Pinch-to-zoom
+      // Pinch-to-zoom + two-finger pan
       const pts = Array.from(activePointers.current.values())
       const dx = pts[1].x - pts[0].x, dy = pts[1].y - pts[0].y
       const dist = Math.sqrt(dx * dx + dy * dy)
-      zoom.current = Math.min(3, Math.max(0.4, pinchStartZoom.current * (dist / pinchStartDist.current)))
+      const newZoom = Math.min(4, Math.max(0.4, pinchStartZoom.current * (dist / pinchStartDist.current)))
+      zoom.current = newZoom
+
+      // Pan by midpoint shift
+      const mid = { x: (pts[0].x + pts[1].x) / 2, y: (pts[0].y + pts[1].y) / 2 }
+      const canvas = canvasRef.current
+      if (canvas) {
+        const scale = canvas.width / canvas.getBoundingClientRect().width
+        const maxPan = (canvas.width / 2) * (newZoom - 1)
+        panOffset.current = {
+          x: Math.max(-maxPan, Math.min(maxPan, pinchStartPan.current.x + (mid.x - pinchStartMid.current.x) * scale)),
+          y: Math.max(-maxPan, Math.min(maxPan, pinchStartPan.current.y + (mid.y - pinchStartMid.current.y) * scale)),
+        }
+      }
+      if (newZoom <= 1) panOffset.current = { x: 0, y: 0 }
       draw()
       return
     }
@@ -255,22 +285,31 @@ export default function SpiralCanvas({ onTapEmpty, onTapEvent }: Props) {
       isDragging.current = true
     }
     if (isDragging.current) {
-      const frac = getAngleFromPointer(e.clientX, e.clientY)
-      if (frac !== null) setNeedle(fracToDate(frac, mode, viewDate))
+      if (zoom.current > 1) {
+        // Pan mode when zoomed in
+        const canvas = canvasRef.current
+        if (canvas) {
+          const scale = canvas.width / canvas.getBoundingClientRect().width
+          const maxPan = (canvas.width / 2) * (zoom.current - 1)
+          panOffset.current = {
+            x: Math.max(-maxPan, Math.min(maxPan, panOffset.current.x + e.movementX * scale)),
+            y: Math.max(-maxPan, Math.min(maxPan, panOffset.current.y + e.movementY * scale)),
+          }
+          draw()
+        }
+      } else {
+        // Rotate needle when not zoomed
+        const frac = getAngleFromPointer(e.clientX, e.clientY)
+        if (frac !== null) setNeedle(fracToDate(frac, mode, viewDate))
+      }
     }
-  }, [mode, viewDate, getAngleFromPointer, setNeedle, draw])
+  }, [mode, viewDate, getAngleFromPointer, canvasToWorld, setNeedle, draw])
 
   const onPointerUp = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
     if (!isDragging.current) {
-      const canvas = canvasRef.current
-      if (!canvas) return
-      const rect = canvas.getBoundingClientRect()
-      const scaleX = canvas.width / rect.width
-      const scaleY = canvas.height / rect.height
-      const x = (e.clientX - rect.left) * scaleX
-      const y = (e.clientY - rect.top) * scaleY
-      const CX = canvas.width / 2, CY = canvas.height / 2
-      const S = canvas.width / 570
+      const w = canvasToWorld(e.clientX, e.clientY)
+      if (!w) { activePointers.current.delete(e.pointerId); return }
+      const { x, y, CX, CY, S } = w
       const R_OUT = 278 * S, R_IN = 75 * S
       const dx = x - CX, dy = y - CY
       const dist = Math.sqrt(dx * dx + dy * dy)
@@ -297,7 +336,7 @@ export default function SpiralCanvas({ onTapEmpty, onTapEvent }: Props) {
 
         if (isSecondTap) {
           // Second tap at needle position — open event or add form
-          const tappedEv = hitTestEvent(x, y, mode, events, categories, CX, CY, S, canvas.width, year, month)
+          const tappedEv = hitTestEvent(x, y, mode, events, categories, CX, CY, S, CX * 2, year, month)
           if (tappedEv) onTapEvent(tappedEv)
           else onTapEmpty(tapDate)
         } else {
@@ -310,7 +349,7 @@ export default function SpiralCanvas({ onTapEmpty, onTapEvent }: Props) {
     if (activePointers.current.size < 2) pinchStartDist.current = null
     isDragging.current = false
     dragStart.current = null
-  }, [mode, viewDate, needle, events, categories, year, month, onTapEvent, onTapEmpty, setNeedle])
+  }, [mode, viewDate, needle, events, categories, year, month, onTapEvent, onTapEmpty, setNeedle, canvasToWorld])
 
   return (
     <div
