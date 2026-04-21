@@ -301,13 +301,20 @@ export default function SpiralCanvas({ onTapEmpty, onTapEvent }: Props) {
   }, [mode, viewDate, needle, events, categories, year, month, onTapEvent, onTapEmpty, setNeedle])
 
   return (
-    <div className="flex-1 flex items-center justify-center bg-[#f5f5f7] overflow-hidden">
+    <div className="flex-1 relative bg-[#f5f5f7] overflow-hidden">
       <canvas
         ref={canvasRef}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
-        style={{ touchAction: 'none', cursor: 'pointer' }}
+        style={{
+          position: 'absolute',
+          top: '50%',
+          left: '50%',
+          transform: 'translate(-50%, -50%)',
+          touchAction: 'none',
+          cursor: 'pointer',
+        }}
       />
     </div>
   )

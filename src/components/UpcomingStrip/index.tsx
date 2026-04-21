@@ -1,3 +1,4 @@
+import { useReducer, useEffect } from 'react'
 import { useAppStore } from '../../store/useAppStore'
 import { useLang } from '../../hooks/useLang'
 import type { CalendarEvent } from '../../types'
@@ -7,11 +8,23 @@ interface Props {
 }
 
 function dayLabel(ev: CalendarEvent, tr: ReturnType<typeof import('../../i18n/translations').getLang>): { text: string; hot: boolean } {
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  const evDate = new Date(ev.date + 'T00:00:00')
-  const diffDays = Math.round((evDate.getTime() - today.getTime()) / 86_400_000)
+  const nowMs = Date.now()
+  const todayStart = new Date()
+  todayStart.setHours(0, 0, 0, 0)
 
+  const evDate = new Date(ev.date + 'T00:00:00')
+  const diffDays = Math.round((evDate.getTime() - todayStart.getTime()) / 86_400_000)
+
+  if (diffDays === 0 && ev.time) {
+    const [h, m] = ev.time.split(':').map(Number)
+    const evMs = new Date(ev.date + `T${ev.time}:00`).getTime()
+    const diffMin = Math.round((evMs - nowMs) / 60_000)
+    if (diffMin <= 0) return { text: tr.today, hot: true }
+    if (diffMin < 60) return { text: `${diffMin}′`, hot: true }
+    const hrs = Math.floor(diffMin / 60)
+    const mins = diffMin % 60
+    return { text: mins > 0 ? `${hrs}:${String(mins).padStart(2, '0')}` : `${hrs}h`, hot: true }
+  }
   if (diffDays === 0) return { text: tr.today, hot: true }
   if (diffDays === 1) return { text: tr.tomorrow, hot: false }
   if (diffDays < 60) return { text: `${tr.inDays} ${diffDays} ${tr.unitDays}`, hot: false }
@@ -21,12 +34,19 @@ function dayLabel(ev: CalendarEvent, tr: ReturnType<typeof import('../../i18n/tr
 export default function UpcomingStrip({ onTap }: Props) {
   const { events, categories } = useAppStore()
   const { tr, rtl } = useLang()
+  const [, tick] = useReducer(x => x + 1, 0)
 
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
+  // update countdown every minute
+  useEffect(() => {
+    const id = setInterval(tick, 60_000)
+    return () => clearInterval(id)
+  }, [])
+
+  const todayStart = new Date()
+  todayStart.setHours(0, 0, 0, 0)
 
   const upcoming = events
-    .filter(e => !e.done && new Date(e.date + 'T00:00:00') >= today)
+    .filter(e => !e.done && new Date(e.date + 'T00:00:00') >= todayStart)
     .sort((a, b) => {
       const da = a.date + (a.time ?? '00:00')
       const db = b.date + (b.time ?? '00:00')
@@ -56,22 +76,18 @@ export default function UpcomingStrip({ onTap }: Props) {
             className="flex-shrink-0 flex items-center gap-1 rounded-lg px-2 py-1 active:opacity-70 transition-opacity"
             style={{ backgroundColor: color + '14', border: `1px solid ${color}33` }}
           >
-            {/* color dot */}
             <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
 
-            {/* title */}
             <span className="text-[11px] font-bold max-w-[80px] truncate" style={{ color }}>
               {ev.title}
             </span>
 
-            {/* time */}
             {ev.time && (
               <span className="text-[10px] font-mono font-semibold text-gray-400 flex-shrink-0">
                 {ev.time}
               </span>
             )}
 
-            {/* day badge */}
             <span
               className={`text-[9px] font-black rounded px-1 py-0.5 flex-shrink-0 ${
                 hot ? 'bg-red-500 text-white' : 'bg-gray-100 text-gray-400'
