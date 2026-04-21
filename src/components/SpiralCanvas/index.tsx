@@ -151,8 +151,18 @@ export default function SpiralCanvas({ onTapEmpty, onTapEvent }: Props) {
     // ── Events ──
     drawEvents(ctx, mode, events, visibleCats, ringRadii, CX, CY, S, year, month, zoom.current, viewDate)
 
-    // ── Critical arc (מניפה) — on top of all rings ──
-    drawCriticalArc(ctx, mode, CX, CY, R_IN, R_CAT_OUT, settings.criticalTime, now, year, month, S)
+    // ── Critical arc — only when now is within the viewed period ──
+    const nowInPeriod = (() => {
+      if (mode === 'day')   return now.toDateString() === viewDate.toDateString()
+      if (mode === 'week') {
+        const wStart = new Date(viewDate); wStart.setDate(viewDate.getDate() - viewDate.getDay()); wStart.setHours(0,0,0,0)
+        const wEnd   = new Date(wStart);   wEnd.setDate(wStart.getDate() + 7)
+        return now >= wStart && now < wEnd
+      }
+      if (mode === 'month') return now.getFullYear() === year && now.getMonth() === month
+      return now.getFullYear() === year
+    })()
+    if (nowInPeriod) drawCriticalArc(ctx, mode, CX, CY, R_IN, R_CAT_OUT, settings.criticalTime, now, year, month, S)
 
     // ── Needle ──
     drawNeedle(ctx, mode, needle, CX, CY, R_IN, R_OUT, S, year, month)
