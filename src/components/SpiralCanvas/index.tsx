@@ -170,7 +170,7 @@ export default function SpiralCanvas({ onTapEmpty, onTapEvent }: Props) {
     if (!canvas) return
     const wrap = canvas.parentElement!
     const resize = () => {
-      const size = wrap.clientWidth
+      const size = Math.min(wrap.clientWidth, wrap.clientHeight)
       canvas.width = size
       canvas.height = size
       draw()
