@@ -6,21 +6,16 @@ interface Props {
   onTap: (ev: CalendarEvent) => void
 }
 
-function timeLabel(ev: CalendarEvent, tr: ReturnType<typeof import('../../i18n/translations').getLang>): string {
+function dayLabel(ev: CalendarEvent, tr: ReturnType<typeof import('../../i18n/translations').getLang>): { text: string; hot: boolean } {
   const today = new Date()
   today.setHours(0, 0, 0, 0)
   const evDate = new Date(ev.date + 'T00:00:00')
-  const diffMs = evDate.getTime() - today.getTime()
-  const diffDays = Math.round(diffMs / 86_400_000)
+  const diffDays = Math.round((evDate.getTime() - today.getTime()) / 86_400_000)
 
-  if (diffDays === 0) {
-    if (ev.time) return ev.time
-    return tr.today
-  }
-  if (diffDays === 1) return tr.tomorrow
-  if (diffDays < 60) return `${tr.inDays} ${diffDays} ${tr.unitDays}`
-  const months = Math.round(diffDays / 30)
-  return `${tr.inDays} ${months} ${tr.unitMonths}`
+  if (diffDays === 0) return { text: tr.today, hot: true }
+  if (diffDays === 1) return { text: tr.tomorrow, hot: false }
+  if (diffDays < 60) return { text: `${tr.inDays} ${diffDays} ${tr.unitDays}`, hot: false }
+  return { text: `${tr.inDays} ${Math.round(diffDays / 30)} ${tr.unitMonths}`, hot: false }
 }
 
 export default function UpcomingStrip({ onTap }: Props) {
@@ -37,7 +32,7 @@ export default function UpcomingStrip({ onTap }: Props) {
       const db = b.date + (b.time ?? '00:00')
       return da < db ? -1 : da > db ? 1 : 0
     })
-    .slice(0, 20)
+    .slice(0, 25)
 
   if (upcoming.length === 0) return null
 
@@ -45,41 +40,44 @@ export default function UpcomingStrip({ onTap }: Props) {
 
   return (
     <div
-      className="flex gap-2 overflow-x-auto px-3 py-1.5 scrollbar-none"
+      className="flex-shrink-0 flex gap-1.5 overflow-x-auto px-2.5 py-1.5 bg-white border-b border-gray-100"
       dir={rtl ? 'rtl' : 'ltr'}
-      style={{ WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none' }}
+      style={{ WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none', msOverflowStyle: 'none' }}
     >
       {upcoming.map(ev => {
         const cat = catMap[ev.categoryId]
         const color = cat?.color ?? '#888'
-        const label = timeLabel(ev, tr)
-        const isToday = label === tr.today || (ev.time !== undefined && new Date(ev.date + 'T00:00:00').getTime() === today.getTime())
+        const { text: dayText, hot } = dayLabel(ev, tr)
 
         return (
           <button
             key={ev.id}
             onClick={() => onTap(ev)}
-            className="flex-shrink-0 flex items-center gap-1.5 bg-white rounded-full shadow-sm border border-gray-100 px-2.5 py-1 active:scale-95 transition-transform"
-            style={{ borderLeftColor: color, borderLeftWidth: 3 }}
+            className="flex-shrink-0 flex items-center gap-1 rounded-lg px-2 py-1 active:opacity-70 transition-opacity"
+            style={{ backgroundColor: color + '14', border: `1px solid ${color}33` }}
           >
             {/* color dot */}
-            <span
-              className="w-2 h-2 rounded-full flex-shrink-0"
-              style={{ backgroundColor: color }}
-            />
+            <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
+
             {/* title */}
-            <span className="text-xs font-semibold text-gray-800 max-w-[90px] truncate">
+            <span className="text-[11px] font-bold max-w-[80px] truncate" style={{ color }}>
               {ev.title}
             </span>
-            {/* time badge */}
+
+            {/* time */}
+            {ev.time && (
+              <span className="text-[10px] font-mono font-semibold text-gray-400 flex-shrink-0">
+                {ev.time}
+              </span>
+            )}
+
+            {/* day badge */}
             <span
-              className={`text-[10px] font-bold rounded-full px-1.5 py-0.5 flex-shrink-0 ${
-                isToday
-                  ? 'bg-red-100 text-red-600'
-                  : 'bg-gray-100 text-gray-500'
+              className={`text-[9px] font-black rounded px-1 py-0.5 flex-shrink-0 ${
+                hot ? 'bg-red-500 text-white' : 'bg-gray-100 text-gray-400'
               }`}
             >
-              {label}
+              {dayText}
             </span>
           </button>
         )

@@ -21,7 +21,7 @@ export default function NeedleBar({ onMenu, onSearch }: Props) {
   const now = new Date()
   const isNow = Math.abs(needle.getTime() - now.getTime()) < 120000
 
-  const label1 = `${tr.days[needle.getDay()]} — ${needle.getDate()} ${tr.months[needle.getMonth()]}`
+  const label1 = `${tr.days[needle.getDay()]} — ${needle.getDate()} ${tr.monthsShort[needle.getMonth()]}`
   const label2 = `${needle.getDate()}/${needle.getMonth()+1} ${needle.getHours().toString().padStart(2,'0')}:${needle.getMinutes().toString().padStart(2,'0')}`
 
   const moveNeedle = useCallback((dir: number) => {
@@ -46,23 +46,31 @@ export default function NeedleBar({ onMenu, onSearch }: Props) {
   }, [needle, events, setNeedle, setViewDate, mode])
 
   return (
-    <div className="flex-shrink-0 flex items-center gap-1 px-2 py-1 bg-white border-b-4 border-red-400">
-      <button onClick={onMenu} className="w-8 h-8 bg-gray-100 rounded-lg text-gray-500 text-lg flex items-center justify-center flex-shrink-0">
+    <div className="flex-shrink-0 flex items-center gap-1 px-2 py-1 bg-white border-b-[3px] border-red-400">
+      {/* menu */}
+      <button onClick={onMenu} className="w-7 h-7 bg-gray-100 rounded-md text-gray-500 text-base flex items-center justify-center flex-shrink-0">
         ☰
       </button>
-      <div className="flex-[0.4]" />
-      <button onClick={() => moveNeedle(-1)} className="w-8 h-8 rounded-full bg-gradient-to-br from-red-500 to-red-700 text-white flex items-center justify-center shadow-md flex-shrink-0 text-base">
+
+      <div className="flex-[0.3]" />
+
+      {/* prev */}
+      <button onClick={() => moveNeedle(-1)} className="w-7 h-7 rounded-full bg-gradient-to-br from-red-400 to-red-600 text-white flex items-center justify-center shadow flex-shrink-0 text-sm">
         ↺
       </button>
-      <div className="flex-1 flex flex-col items-center gap-0.5 min-w-0">
-        <span className="text-xs font-black text-[#1a1a2e] whitespace-nowrap overflow-hidden text-ellipsis max-w-full">
+
+      {/* center info */}
+      <div className="flex-1 flex flex-col items-center min-w-0">
+        <span className="text-[11px] font-black text-gray-800 whitespace-nowrap overflow-hidden text-ellipsis max-w-full">
           {label1}
         </span>
-        <span className={`text-[10px] font-bold font-mono ${isNow ? 'text-orange-400' : 'text-gray-500'}`}>
+        <span className={`text-[9px] font-semibold font-mono ${isNow ? 'text-orange-400' : 'text-gray-400'}`}>
           {isNow ? tr.now : label2}
         </span>
-        <button onClick={() => { try { timeInputRef.current?.showPicker?.() } catch { timeInputRef.current?.click() } }}
-          className="bg-blue-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-md mt-0.5 relative">
+        <button
+          onClick={() => { try { timeInputRef.current?.showPicker?.() } catch { timeInputRef.current?.click() } }}
+          className="bg-blue-500 text-white text-[9px] font-bold px-2 py-0.5 rounded mt-0.5 relative"
+        >
           {tr.pickTime}
           <input
             ref={timeInputRef}
@@ -73,11 +81,16 @@ export default function NeedleBar({ onMenu, onSearch }: Props) {
           />
         </button>
       </div>
-      <button onClick={() => moveNeedle(1)} className="w-8 h-8 rounded-full bg-gradient-to-br from-red-500 to-red-700 text-white flex items-center justify-center shadow-md flex-shrink-0 text-base">
+
+      {/* next */}
+      <button onClick={() => moveNeedle(1)} className="w-7 h-7 rounded-full bg-gradient-to-br from-red-400 to-red-600 text-white flex items-center justify-center shadow flex-shrink-0 text-sm">
         ↻
       </button>
-      <div className="flex-[0.4]" />
-      <button onClick={onSearch} className="w-10 h-10 bg-blue-500 rounded-xl text-white text-xl flex items-center justify-center shadow-md flex-shrink-0">
+
+      <div className="flex-[0.3]" />
+
+      {/* search */}
+      <button onClick={onSearch} className="w-8 h-8 bg-blue-500 rounded-lg text-white text-base flex items-center justify-center shadow flex-shrink-0">
         🔍
       </button>
     </div>
