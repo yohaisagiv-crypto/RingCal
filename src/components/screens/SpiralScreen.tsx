@@ -82,33 +82,11 @@ export default function SpiralScreen({ onNavigate }: Props) {
       {showMenu && (
         <>
           <div className="absolute inset-0 bg-black/40 z-40" onClick={() => setShowMenu(false)} />
-          <div dir={rtl ? 'rtl' : 'ltr'} className="absolute top-0 right-0 h-full w-64 bg-white shadow-2xl z-50 flex flex-col pt-10 px-4 gap-2">
-            <p className="text-xs font-mono text-gray-400 uppercase tracking-widest mb-2">{tr.mainMenu}</p>
-            <button
-              onClick={() => { setShowMenu(false); setShowHelp(true) }}
-              className="flex items-center gap-3 px-4 py-3 rounded-xl bg-blue-50 text-blue-700 font-bold text-sm text-right"
-            >
-              <span className="text-xl">❓</span>
-              {tr.helpTitle}
-            </button>
-            {[
-              { icon: '🌀', label: tr.ringcal, page: 0 },
-              { icon: '📋', label: tr.eventsList, page: 1 },
-              { icon: '⚙️', label: tr.settings, page: 2 },
-            ].map(item => (
-              <button
-                key={item.page}
-                onClick={() => { setShowMenu(false); onNavigate(item.page) }}
-                className="flex items-center gap-3 px-4 py-3 rounded-xl bg-gray-50 hover:bg-blue-50 text-gray-800 font-bold text-sm text-right"
-              >
-                <span className="text-xl">{item.icon}</span>
-                {item.label}
-              </button>
-            ))}
-            <div className="flex-1" />
+          <div dir={rtl ? 'rtl' : 'ltr'} className="absolute top-0 right-0 h-full w-64 bg-white shadow-2xl z-50 flex flex-col pt-8 px-4 gap-2">
+            <p className="text-xs font-mono text-gray-400 uppercase tracking-widest mb-1">{tr.mainMenu}</p>
 
-            {/* Language quick-switch */}
-            <div className="px-1 pb-2">
+            {/* Language quick-switch — at top */}
+            <div className="px-1 pb-1 mb-1 border-b border-gray-100">
               <p className="text-[9px] font-mono text-gray-400 uppercase tracking-widest mb-2">שפה / Language</p>
               <div className="flex flex-wrap gap-1.5">
                 {[
@@ -133,6 +111,28 @@ export default function SpiralScreen({ onNavigate }: Props) {
               </div>
             </div>
 
+            <button
+              onClick={() => { setShowMenu(false); setShowHelp(true) }}
+              className="flex items-center gap-3 px-4 py-3 rounded-xl bg-blue-50 text-blue-700 font-bold text-sm text-right"
+            >
+              <span className="text-xl">❓</span>
+              {tr.helpTitle}
+            </button>
+            {[
+              { icon: '🌀', label: tr.ringcal, page: 0 },
+              { icon: '📋', label: tr.eventsList, page: 1 },
+              { icon: '⚙️', label: tr.settings, page: 2 },
+            ].map(item => (
+              <button
+                key={item.page}
+                onClick={() => { setShowMenu(false); onNavigate(item.page) }}
+                className="flex items-center gap-3 px-4 py-3 rounded-xl bg-gray-50 hover:bg-blue-50 text-gray-800 font-bold text-sm text-right"
+              >
+                <span className="text-xl">{item.icon}</span>
+                {item.label}
+              </button>
+            ))}
+            <div className="flex-1" />
             <button onClick={() => setShowMenu(false)} className="mb-4 text-sm text-gray-400 font-bold py-2">{tr.close}</button>
           </div>
         </>

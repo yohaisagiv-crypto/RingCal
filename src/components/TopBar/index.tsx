@@ -25,7 +25,7 @@ export default function TopBar() {
   }
 
   return (
-    <div className="flex-shrink-0 bg-white border-b border-gray-150">
+    <div className="flex-shrink-0 bg-white border-b-2 border-gray-100">
       {/* nav row */}
       <div className="flex items-center px-2 py-0.5 gap-1">
         <button onClick={() => navigate(-1)} className="w-7 h-7 bg-gray-100 rounded-md text-gray-500 font-bold text-sm flex items-center justify-center">‹</button>
@@ -39,15 +39,15 @@ export default function TopBar() {
         )}
       </div>
       {/* tabs row */}
-      <div className="flex border-t border-gray-100">
+      <div className="flex bg-gray-50 mx-2 mb-1.5 rounded-xl p-0.5 gap-0.5">
         {TABS.map(t => (
           <button
             key={t.mode}
             onClick={() => setMode(t.mode)}
-            className={`flex-1 py-1 text-[11px] font-bold tracking-wide transition-all border-b-2 ${
+            className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${
               mode === t.mode
-                ? 'text-blue-500 border-blue-500 bg-blue-50/50'
-                : 'text-gray-400 border-transparent hover:text-gray-600'
+                ? 'bg-white text-blue-600 shadow-sm'
+                : 'text-gray-500 hover:text-gray-700'
             }`}
           >
             {t.label}
