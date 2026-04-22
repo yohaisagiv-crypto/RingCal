@@ -21,7 +21,7 @@ export default function SpiralScreen({ onNavigate }: Props) {
   const [showHelp, setShowHelp] = useState(false)
   const [showSearch, setShowSearch] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
-  const { events, settings, updateSettings, gcalConnected, addEvent, patchEventGcalId, categories } = useAppStore()
+  const { events, settings, updateSettings, gcalConnected, addEvent, patchEventGcalId, categories, needle } = useAppStore()
   const { tr, rtl } = useLang()
 
   const closeSheet = () => { setSheetEvent(null); setAddDate(null) }
