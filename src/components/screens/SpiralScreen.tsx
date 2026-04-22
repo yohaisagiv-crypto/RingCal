@@ -67,7 +67,7 @@ export default function SpiralScreen({ onNavigate }: Props) {
 
       {/* FAB */}
       <button
-        onClick={() => setAddDate(new Date())}
+        onClick={() => setAddDate(needle)}
         className="absolute bottom-4 left-4 rounded-full bg-blue-500 text-white text-3xl shadow-lg flex items-center justify-center z-30"
         style={{ width: 52, height: 52 }}
       >
