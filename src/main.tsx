@@ -2,6 +2,20 @@ import ReactDOM from 'react-dom/client'
 import { RouterProvider, createRouter } from '@tanstack/react-router'
 import { routeTree } from './routeTree.gen'
 
+// OAuth callback — handle BEFORE router renders
+if (window.location.pathname === '/oauth' && window.location.hash.includes('access_token')) {
+  const params = new URLSearchParams(window.location.hash.slice(1))
+  const token = params.get('access_token')
+  if (token) {
+    if (/Android/i.test(navigator.userAgent)) {
+      window.location.href = 'com.ringcal.app://oauth' + window.location.hash
+    } else {
+      window.opener?.postMessage(window.location.href, window.location.origin)
+      window.close()
+    }
+  }
+}
+
 // Capacitor — initialize on mobile
 async function initApp() {
   if ((window as unknown as { Capacitor?: { isNativePlatform?: () => boolean } }).Capacitor?.isNativePlatform?.()) {
@@ -14,6 +28,12 @@ async function initApp() {
 }
 
 initApp().catch(console.warn)
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(() => {})
+  })
+}
 
 const router = createRouter({
   routeTree,
