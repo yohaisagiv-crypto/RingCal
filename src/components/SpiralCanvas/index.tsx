@@ -285,23 +285,9 @@ export default function SpiralCanvas({ onTapEmpty, onTapEvent }: Props) {
       isDragging.current = true
     }
     if (isDragging.current) {
-      if (zoom.current > 1) {
-        // Pan mode when zoomed in
-        const canvas = canvasRef.current
-        if (canvas) {
-          const scale = canvas.width / canvas.getBoundingClientRect().width
-          const maxPan = (canvas.width / 2) * (zoom.current - 1)
-          panOffset.current = {
-            x: Math.max(-maxPan, Math.min(maxPan, panOffset.current.x + e.movementX * scale)),
-            y: Math.max(-maxPan, Math.min(maxPan, panOffset.current.y + e.movementY * scale)),
-          }
-          draw()
-        }
-      } else {
-        // Rotate needle when not zoomed
-        const frac = getAngleFromPointer(e.clientX, e.clientY)
-        if (frac !== null) setNeedle(fracToDate(frac, mode, viewDate))
-      }
+      // Single finger always rotates needle (pan is two-finger only)
+      const frac = getAngleFromPointer(e.clientX, e.clientY)
+      if (frac !== null) setNeedle(fracToDate(frac, mode, viewDate))
     }
   }, [mode, viewDate, getAngleFromPointer, canvasToWorld, setNeedle, draw])
 
@@ -332,15 +318,17 @@ export default function SpiralCanvas({ onTapEmpty, onTapEvent }: Props) {
         }
 
         const needleDiff = Math.min(Math.abs(frac - needleFrac), 1 - Math.abs(frac - needleFrac))
-        const isSecondTap = needleDiff < 0.04
+        const isOnNeedle = needleDiff < 0.03
 
-        if (isSecondTap) {
-          // Second tap at needle position — open event or add form
-          const tappedEv = hitTestEvent(x, y, mode, events, categories, CX, CY, S, CX * 2, year, month)
-          if (tappedEv) onTapEvent(tappedEv)
-          else onTapEmpty(tapDate)
+        // Tap directly on event dot → open event
+        const tappedEv = hitTestEvent(x, y, mode, events, categories, CX, CY, S, CX * 2, year, month)
+        if (tappedEv) {
+          onTapEvent(tappedEv)
+        } else if (isOnNeedle) {
+          // Double-tap on needle → open add form at that date
+          onTapEmpty(tapDate)
         } else {
-          // First tap — move needle to tapped position
+          // Regular tap → move needle only
           setNeedle(tapDate)
         }
       }
