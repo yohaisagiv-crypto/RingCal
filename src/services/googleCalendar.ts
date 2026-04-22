@@ -55,7 +55,9 @@ export function authorize(): Promise<string> {
     // Listen for redirect (Capacitor or browser hash)
     const handleUrl = (url: string) => {
       if (!url.includes('access_token')) return
-      const hash = new URLSearchParams(url.split('#')[1] ?? url.split('?')[1] ?? '')
+      const fragment = url.split('#')[1] ?? ''
+      const query = url.split('?')[1]?.split('#')[0] ?? ''
+      const hash = new URLSearchParams(fragment || query)
       const token = hash.get('access_token')
       if (token) {
         localStorage.setItem(TOKEN_KEY, token)

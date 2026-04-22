@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>מחבר...</title>
+  <style>
+    body { font-family: Arial, sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; background: #f0f4ff; }
+    .box { text-align: center; padding: 2rem; }
+    a.btn { display: inline-block; margin-top: 1rem; padding: 1rem 2rem; background: #4285f4; color: white; border-radius: 12px; text-decoration: none; font-size: 1.1rem; font-weight: bold; }
+  </style>
+</head>
+<body>
+<div class="box">
+  <p id="msg">מחבר לאפליקציה...</p>
+  <a id="btn" class="btn" style="display:none">פתח את RingCal</a>
+</div>
+<script>
+  var hash = window.location.hash;
+  if (!hash.includes('access_token')) {
+    document.getElementById('msg').textContent = 'שגיאה — לא נמצא טוקן';
+  } else {
+    var params = hash.slice(1); // access_token=...&...
+    var isAndroid = /Android/i.test(navigator.userAgent);
+    if (isAndroid) {
+      // Android Intent URI — Chrome supports this natively
+      var intentUrl = 'intent://oauth?' + params + '#Intent;scheme=com.ringcal.app;package=com.spiraldiary.app;end;';
+      var btn = document.getElementById('btn');
+      btn.href = intentUrl;
+      btn.style.display = 'inline-block';
+      document.getElementById('msg').textContent = 'לחץ כדי לפתוח את האפליקציה';
+      // Also try automatic after short delay
+      setTimeout(function() { window.location.href = intentUrl; }, 500);
+    } else {
+      // Web: send to opener popup
+      if (window.opener) {
+        window.opener.postMessage(window.location.href, '*');
+        window.close();
+      }
+    }
+  }
+</script>
+</body>
+</html>
