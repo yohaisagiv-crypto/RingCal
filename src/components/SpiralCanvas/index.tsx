@@ -355,8 +355,8 @@ export default function SpiralCanvas({ onTapEmpty, onTapEvent }: Props) {
     <div
       className="flex-1 overflow-hidden bg-[#f5f5f7]"
       style={{ position: 'relative' }}
-      onTouchStart={(e) => { if (zoom.current > 1) e.stopPropagation() }}
-      onTouchEnd={(e)   => { if (zoom.current > 1) e.stopPropagation() }}
+      onTouchStart={(e) => { if (zoom.current > 1 || e.touches.length >= 2) e.stopPropagation() }}
+      onTouchEnd={(e)   => { if (zoom.current > 1 || e.touches.length >= 1 || activePointers.current.size >= 2) e.stopPropagation() }}
     >
       <canvas
         ref={canvasRef}
