@@ -121,7 +121,9 @@ export default function SpiralScreen({ onNavigate }: Props) {
             {[
               { icon: '🌀', label: tr.ringcal, page: 0 },
               { icon: '📋', label: tr.eventsList, page: 1 },
-              { icon: '⚙️', label: tr.settings, page: 2 },
+              { icon: '✅', label: 'מטלות', page: 2 },
+              { icon: '🤖', label: 'AI', page: 3 },
+              { icon: '⚙️', label: tr.settings, page: 4 },
             ].map(item => (
               <button
                 key={item.page}

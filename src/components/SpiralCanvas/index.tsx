@@ -11,7 +11,7 @@ interface Props {
 
 export default function SpiralCanvas({ onTapEmpty, onTapEvent }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
-  const { mode, needle, viewDate, events, categories, settings, setNeedle } = useAppStore()
+  const { mode, needle, viewDate, events, categories, settings, setNeedle, spiralGeneration } = useAppStore()
   const { tr } = useLang()
   const now = new Date()
   const year = viewDate.getFullYear()
@@ -30,6 +30,11 @@ export default function SpiralCanvas({ onTapEmpty, onTapEvent }: Props) {
   const pinchStartPan = useRef<{ x: number; y: number }>({ x: 0, y: 0 })
   const pinchStartMid = useRef<{ x: number; y: number }>({ x: 0, y: 0 })
   const wasPinching = useRef(false)
+
+  useEffect(() => {
+    zoom.current = 1
+    panOffset.current = { x: 0, y: 0 }
+  }, [mode, spiralGeneration])
 
   const draw = useCallback(() => {
     const canvas = canvasRef.current
@@ -184,7 +189,7 @@ export default function SpiralCanvas({ onTapEmpty, onTapEvent }: Props) {
     if (!canvas) return
     const wrap = canvas.parentElement!
     const resize = () => {
-      const size = Math.min(wrap.offsetWidth, wrap.offsetHeight)
+      const size = Math.min(wrap.offsetWidth, wrap.offsetHeight) - 16
       canvas.width = size
       canvas.height = size
       canvas.style.width = size + 'px'
@@ -582,6 +587,7 @@ function drawEvents(
   }
 
   events.forEach(ev => {
+    if (ev.done) return
     const angles = getAngle(ev)
     if (!angles) return
     const { a1, a2 } = angles
@@ -593,7 +599,7 @@ function drawEvents(
     const [r, g, b] = hexToRgb(col)
 
     ctx.save()
-    ctx.globalAlpha = ev.done ? 0.3 : 0.85
+    ctx.globalAlpha = 0.85
     ctx.beginPath()
     ctx.arc(CX, CY, rb, a1, a2)
     ctx.arc(CX, CY, ra, a2, a1, true)
@@ -607,9 +613,19 @@ function drawEvents(
     const p = pxy(daMid, rMid, CX, CY)
     const cr = Math.max(3, Math.round(3.5 * S))
     ctx.save()
-    ctx.beginPath(); ctx.arc(p.x, p.y, cr, 0, Math.PI * 2)
-    ctx.fillStyle = '#fff'; ctx.globalAlpha = 0.9; ctx.fill()
-    ctx.strokeStyle = col; ctx.lineWidth = 1.5; ctx.globalAlpha = 1; ctx.stroke()
+    if (ev.itemType === 'task') {
+      // diamond marker
+      ctx.translate(p.x, p.y)
+      ctx.rotate(Math.PI / 4)
+      ctx.beginPath()
+      ctx.rect(-cr, -cr, cr * 2, cr * 2)
+      ctx.fillStyle = col; ctx.globalAlpha = 0.95; ctx.fill()
+      ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5; ctx.globalAlpha = 1; ctx.stroke()
+    } else {
+      ctx.beginPath(); ctx.arc(p.x, p.y, cr, 0, Math.PI * 2)
+      ctx.fillStyle = '#fff'; ctx.globalAlpha = 0.9; ctx.fill()
+      ctx.strokeStyle = col; ctx.lineWidth = 1.5; ctx.globalAlpha = 1; ctx.stroke()
+    }
     ctx.restore()
 
     // Show label when zoomed in enough

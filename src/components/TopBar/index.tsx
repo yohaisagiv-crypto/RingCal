@@ -25,9 +25,9 @@ export default function TopBar() {
   }
 
   return (
-    <div className="flex-shrink-0 bg-white border-b-2 border-gray-100">
+    <div className="flex-shrink-0 bg-white border-b border-gray-200">
       {/* nav row */}
-      <div className="flex items-center px-2 py-0.5 gap-1">
+      <div className="flex items-center px-2 py-1 gap-1">
         <button onClick={() => navigate(-1)} className="w-7 h-7 bg-gray-100 rounded-md text-gray-500 font-bold text-sm flex items-center justify-center">‹</button>
         <span className="flex-1 text-center font-semibold text-xs text-gray-500 tracking-wide">{monthLabel}</span>
         <button onClick={() => navigate(1)} className="w-7 h-7 bg-gray-100 rounded-md text-gray-500 font-bold text-sm flex items-center justify-center">›</button>
@@ -39,15 +39,15 @@ export default function TopBar() {
         )}
       </div>
       {/* tabs row */}
-      <div className="flex bg-gray-50 mx-2 mb-1.5 rounded-xl p-0.5 gap-0.5">
+      <div className="flex bg-gray-200 mx-2 mb-2 rounded-xl p-1 gap-1">
         {TABS.map(t => (
           <button
             key={t.mode}
             onClick={() => setMode(t.mode)}
-            className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${
+            className={`flex-1 py-2 text-sm font-extrabold rounded-lg transition-all ${
               mode === t.mode
-                ? 'bg-white text-blue-600 shadow-sm'
-                : 'text-gray-500 hover:text-gray-700'
+                ? 'bg-blue-500 text-white shadow-md'
+                : 'bg-gray-100 text-gray-500 hover:bg-gray-50 hover:text-gray-700'
             }`}
           >
             {t.label}

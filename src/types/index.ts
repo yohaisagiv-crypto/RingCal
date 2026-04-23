@@ -14,6 +14,7 @@ export interface Category {
 export interface CalendarEvent {
   id: string
   title: string
+  itemType?: 'event' | 'task'
   categoryId: string
   date: string       // ISO date string YYYY-MM-DD
   time?: string      // HH:MM
@@ -53,4 +54,5 @@ export interface AppSettings {
   showDepLinks: boolean
   criticalTime: CriticalTime
   defaultMode: ViewMode
+  geminiApiKey?: string
 }

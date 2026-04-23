@@ -24,6 +24,9 @@ interface AppState {
   needle: Date
   viewDate: Date
 
+  spiralGeneration: number
+  bumpSpiralGeneration: () => void
+
   gcalConnected: boolean
   setGcalConnected: (v: boolean) => void
   patchEventGcalId: (id: string, gcalId: string) => void
@@ -52,6 +55,9 @@ export const useAppStore = create<AppState>()(
       mode: 'week',
       needle: new Date(),
       viewDate: new Date(),
+      spiralGeneration: 0,
+      bumpSpiralGeneration: () => set(s => ({ spiralGeneration: s.spiralGeneration + 1 })),
+
       gcalConnected: false,
 
       setGcalConnected: (v) => set({ gcalConnected: v }),
@@ -130,7 +136,6 @@ export const useAppStore = create<AppState>()(
         events: s.events,
         categories: s.categories,
         settings: s.settings,
-        mode: s.mode,
         gcalConnected: s.gcalConnected,
       }),
       merge: (persisted, current) => {
@@ -138,12 +143,18 @@ export const useAppStore = create<AppState>()(
         return {
           ...current,
           ...p,
+          mode: 'week',
+          // Migrate legacy events: make itemType explicit so filters are unambiguous
+          events: (p.events ?? []).map(e => ({
+            ...e,
+            itemType: e.itemType ?? 'event',
+          })),
           settings: {
             ...current.settings,
             ...p.settings,
             criticalTime: {
-              ...current.settings.criticalTime,   // defaults (כולל year: 2)
-              ...p.settings?.criticalTime,         // ערכים שמורים
+              ...current.settings.criticalTime,
+              ...p.settings?.criticalTime,
             },
           },
         }

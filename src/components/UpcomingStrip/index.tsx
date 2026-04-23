@@ -70,12 +70,16 @@ export default function UpcomingStrip({ onTap }: Props) {
   const { from, to } = periodBounds(mode, viewDate)
   const catMap = Object.fromEntries(categories.map(c => [c.id, c]))
 
+  const today = new Date().toISOString().slice(0, 10)
   const periodEvents = events
     .filter(e => !e.done && e.date >= from && e.date <= to)
     .sort((a, b) => {
+      const aFuture = a.date >= today
+      const bFuture = b.date >= today
+      if (aFuture !== bFuture) return aFuture ? -1 : 1
       const da = a.date + (a.time ?? '00:00')
       const db = b.date + (b.time ?? '00:00')
-      return da < db ? -1 : da > db ? 1 : 0
+      return aFuture ? (da < db ? -1 : 1) : (da > db ? -1 : 1)
     })
     .slice(0, 30)
 
@@ -86,6 +90,8 @@ export default function UpcomingStrip({ onTap }: Props) {
       className="flex-shrink-0 flex gap-1.5 overflow-x-auto px-2.5 py-1.5 bg-white border-b border-gray-100"
       dir={rtl ? 'rtl' : 'ltr'}
       style={{ WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+      onTouchStart={e => e.stopPropagation()}
+      onTouchEnd={e => e.stopPropagation()}
     >
       {periodEvents.length === 0 && (
         <span className="text-[10px] text-gray-300 font-medium px-1 py-0.5">

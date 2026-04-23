@@ -7,7 +7,47 @@ import * as gcal from '../../services/googleCalendar'
 interface Props {
   event: CalendarEvent | null
   defaultDate: Date | null
+  defaultItemType?: 'event' | 'task'
+  forceItemType?: 'event' | 'task'
   onClose: () => void
+}
+
+function shareIcs({ title, date, time, endTime, note, location, id }: {
+  title: string; date: string; time?: string; endTime?: string
+  note?: string; location?: string; id: string
+}) {
+  const fmt = (d: string, t?: string) => {
+    const base = d.replace(/-/g, '')
+    if (!t) return base
+    return base + 'T' + t.replace(':', '') + '00'
+  }
+  const uid = `${id}@ringcal`
+  const dtstart = time ? fmt(date, time) : fmt(date)
+  const dtend = endTime ? fmt(date, endTime) : dtstart
+  const ics = [
+    'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//RingCal//RingCal//EN',
+    'BEGIN:VEVENT',
+    `UID:${uid}`,
+    `DTSTART:${dtstart}`,
+    `DTEND:${dtend}`,
+    `SUMMARY:${title}`,
+    note ? `DESCRIPTION:${note.replace(/\n/g, '\\n')}` : '',
+    location ? `LOCATION:${location}` : '',
+    'END:VEVENT', 'END:VCALENDAR',
+  ].filter(Boolean).join('\r\n')
+
+  const blob = new Blob([ics], { type: 'text/calendar' })
+  const file = new File([blob], `${title}.ics`, { type: 'text/calendar' })
+
+  if (navigator.canShare?.({ files: [file] })) {
+    navigator.share({ files: [file], title })
+  } else {
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url; a.download = `${title}.ics`
+    a.click()
+    setTimeout(() => URL.revokeObjectURL(url), 1000)
+  }
 }
 
 const DEP_TYPES = [
@@ -17,11 +57,12 @@ const DEP_TYPES = [
   { v: 'SF', label: 'התחלה → סוף' },
 ] as const
 
-export default function EventSheet({ event, defaultDate, onClose }: Props) {
+export default function EventSheet({ event, defaultDate, defaultItemType = 'event', forceItemType, onClose }: Props) {
   const { addEvent, updateEvent, deleteEvent, categories, events: allEvents, gcalConnected, patchEventGcalId } = useAppStore()
   const { tr } = useLang()
   const isEdit = !!event
 
+  const [itemType, setItemType] = useState<'event' | 'task'>(forceItemType ?? event?.itemType ?? defaultItemType)
   const [title, setTitle] = useState(event?.title ?? '')
   const [categoryId, setCategoryId] = useState(event?.categoryId ?? categories[0]?.id ?? '')
   const [date, setDate] = useState(
@@ -47,7 +88,7 @@ export default function EventSheet({ event, defaultDate, onClose }: Props) {
     const evData = { title: title.trim(), date, time, endTime, note, location }
     const data: Omit<CalendarEvent, 'id'> = {
       title: title.trim(), categoryId, date, time, endTime, note, location, priority,
-      done: false, links: [], files: [],
+      itemType: forceItemType ?? itemType, done: false, links: [], files: [],
       ...(showDep && dependsOn ? { dependsOn, dependsType, lag, lagForce } : {}),
     }
     if (isEdit && event) {
@@ -62,6 +103,13 @@ export default function EventSheet({ event, defaultDate, onClose }: Props) {
           if (newEv) patchEventGcalId(newEv.id, gcalId)
         }).catch(() => {})
       }
+    }
+    onClose()
+  }
+
+  const convertToTask = () => {
+    if (event) {
+      updateEvent(event.id, { itemType: 'task' })
     }
     onClose()
   }
@@ -92,6 +140,28 @@ export default function EventSheet({ event, defaultDate, onClose }: Props) {
         className="absolute bottom-0 left-0 right-0 bg-white rounded-t-2xl shadow-2xl z-50 max-h-[90vh] overflow-y-auto px-4 pb-8"
       >
         <div className="w-10 h-1 rounded-full bg-gray-200 mx-auto my-3" />
+
+        {/* Event / Task toggle — hidden when type is forced */}
+        {forceItemType ? (
+          <div className="flex items-center gap-2 mb-3 px-1">
+            <span className="text-base">{forceItemType === 'task' ? '✅' : '📅'}</span>
+            <span className="font-extrabold text-sm text-gray-700">{forceItemType === 'task' ? 'מטלה' : 'אירוע'}</span>
+          </div>
+        ) : (
+          <div className="flex bg-gray-100 rounded-xl p-1 gap-1 mb-3">
+            {(['event', 'task'] as const).map(t => (
+              <button
+                key={t}
+                onClick={() => setItemType(t)}
+                className={`flex-1 py-1.5 rounded-lg text-sm font-extrabold transition-all ${
+                  itemType === t ? 'bg-blue-500 text-white shadow' : 'text-gray-500'
+                }`}
+              >
+                {t === 'event' ? '📅 אירוע' : '✅ מטלה'}
+              </button>
+            ))}
+          </div>
+        )}
 
         {/* Header */}
         <div className="flex items-center justify-between mb-3 gap-2">
@@ -336,6 +406,26 @@ export default function EventSheet({ event, defaultDate, onClose }: Props) {
               {lagForce ? tr.forceLink : tr.guideOnly}
             </button>
           </div>
+        )}
+
+        {/* Convert to task — shown when editing an event that is NOT already a task */}
+        {isEdit && !forceItemType && itemType === 'event' && (
+          <button
+            onClick={convertToTask}
+            className="w-full mb-2 py-3 bg-green-500 text-white rounded-xl text-sm font-extrabold flex items-center justify-center gap-2 shadow-sm"
+          >
+            ✅ המר למטלה — יעבור למסך המטלות
+          </button>
+        )}
+
+        {/* Share / invite */}
+        {isEdit && (
+          <button
+            onClick={() => shareIcs({ title, date, time, endTime, note, location, id: event!.id })}
+            className="w-full mb-2 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold text-gray-600 flex items-center justify-center gap-2"
+          >
+            <span>📨</span> שלח זימון / שתף
+          </button>
         )}
 
         {/* Actions */}
