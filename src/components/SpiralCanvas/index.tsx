@@ -586,6 +586,42 @@ function drawEvents(
     return null
   }
 
+  // Returns extended end angle for tasks with duration > one unit
+  const getTaskEndAngle = (ev: CalendarEvent, a1: number, a2: number): number => {
+    if (mode === 'day') {
+      if (ev.endTime) {
+        const [eh, em] = ev.endTime.split(':').map(Number)
+        return ang(eh + em / 60, 24)
+      }
+      const durH = (ev.durationHours ?? 0) + (ev.durationMinutes ?? 0) / 60
+      if (durH > 0.9) {
+        const [hh, mm] = (ev.time || '00:00').split(':').map(Number)
+        return ang(Math.min(24, hh + mm / 60 + durH), 24)
+      }
+    }
+    if (mode === 'week' && (ev.durationDays ?? 0) > 1) {
+      const weekStart = getWeekStart(viewDate)
+      const d = new Date(ev.date)
+      const diff = Math.floor((d.getTime() - weekStart.getTime()) / 86400000)
+      return ang(Math.min(7, diff + (ev.durationDays ?? 1)), 7)
+    }
+    if (mode === 'month' && (ev.durationDays ?? 0) > 1) {
+      const d = new Date(ev.date)
+      if (d.getFullYear() !== year || d.getMonth() !== month) return a2
+      const dim = daysInMonth(year, month)
+      return ang(Math.min(dim, d.getDate() - 1 + (ev.durationDays ?? 1)), dim)
+    }
+    if (mode === 'year' && (ev.durationDays ?? 0) > 15) {
+      const d = new Date(ev.date)
+      if (d.getFullYear() !== year) return a2
+      const m = d.getMonth()
+      const dim = daysInMonth(year, m)
+      const ss = ang(m, 12); const sp = ang(m + 1, 12) - ss
+      return ss + (Math.min(dim, d.getDate() - 1 + (ev.durationDays ?? 1)) / dim) * sp
+    }
+    return a2
+  }
+
   events.forEach(ev => {
     if (ev.done) return
     const angles = getAngle(ev)
@@ -597,45 +633,62 @@ function drawEvents(
     const rb = ringRadii[catIdx + 1]
     const col = visibleCats[catIdx].color
     const [r, g, b] = hexToRgb(col)
-
-    ctx.save()
-    ctx.globalAlpha = 0.85
-    ctx.beginPath()
-    ctx.arc(CX, CY, rb, a1, a2)
-    ctx.arc(CX, CY, ra, a2, a1, true)
-    ctx.closePath()
-    ctx.fillStyle = `rgba(${r},${g},${b},.45)`
-    ctx.fill()
-    ctx.restore()
-
-    const daMid = (a1 + a2) / 2
     const rMid = (ra + rb) / 2
-    const p = pxy(daMid, rMid, CX, CY)
-    const cr = Math.max(3, Math.round(3.5 * S))
-    ctx.save()
+
     if (ev.itemType === 'task') {
-      // diamond marker
+      // Draw thick arc line on ring midline spanning full duration
+      const a2End = getTaskEndAngle(ev, a1, a2)
+      const lineW = Math.max(3, (rb - ra) * 0.55)
+      ctx.save()
+      ctx.beginPath()
+      ctx.arc(CX, CY, rMid, a1, a2End)
+      ctx.strokeStyle = col
+      ctx.lineWidth = lineW
+      ctx.globalAlpha = 0.85
+      ctx.lineCap = 'round'
+      ctx.stroke()
+      ctx.restore()
+      // Diamond marker at start
+      const p = pxy(a1, rMid, CX, CY)
+      const cr = Math.max(3, Math.round(3.5 * S))
+      ctx.save()
       ctx.translate(p.x, p.y)
       ctx.rotate(Math.PI / 4)
       ctx.beginPath()
       ctx.rect(-cr, -cr, cr * 2, cr * 2)
       ctx.fillStyle = col; ctx.globalAlpha = 0.95; ctx.fill()
       ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5; ctx.globalAlpha = 1; ctx.stroke()
+      ctx.restore()
     } else {
+      ctx.save()
+      ctx.globalAlpha = 0.85
+      ctx.beginPath()
+      ctx.arc(CX, CY, rb, a1, a2)
+      ctx.arc(CX, CY, ra, a2, a1, true)
+      ctx.closePath()
+      ctx.fillStyle = `rgba(${r},${g},${b},.45)`
+      ctx.fill()
+      ctx.restore()
+
+      const daMid = (a1 + a2) / 2
+      const p = pxy(daMid, rMid, CX, CY)
+      const cr = Math.max(3, Math.round(3.5 * S))
+      ctx.save()
       ctx.beginPath(); ctx.arc(p.x, p.y, cr, 0, Math.PI * 2)
       ctx.fillStyle = '#fff'; ctx.globalAlpha = 0.9; ctx.fill()
       ctx.strokeStyle = col; ctx.lineWidth = 1.5; ctx.globalAlpha = 1; ctx.stroke()
+      ctx.restore()
     }
-    ctx.restore()
 
     // Show label when zoomed in enough
     if (zoom >= 1.6) {
+      const labelAngle = ev.itemType === 'task' ? a1 : (a1 + a2) / 2
       const labelR = rb + 10 * S
-      const lp = pxy(daMid, labelR, CX, CY)
+      const lp = pxy(labelAngle, labelR, CX, CY)
       const fontSize = Math.max(7, Math.round(7 * S))
       ctx.save()
       ctx.translate(lp.x, lp.y)
-      ctx.rotate(daMid + Math.PI / 2)
+      ctx.rotate(labelAngle + Math.PI / 2)
       ctx.textAlign = 'center'
       ctx.textBaseline = 'middle'
       // Background pill

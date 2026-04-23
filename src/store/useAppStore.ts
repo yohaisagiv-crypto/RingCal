@@ -1,6 +1,26 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import type { CalendarEvent, Category, AppSettings, ViewMode, CriticalTime } from '../types'
+import type { CalendarEvent, Category, AppSettings, ViewMode, CriticalTime, RecurrenceRule } from '../types'
+
+function generateInstances(master: CalendarEvent): CalendarEvent[] {
+  const rule: RecurrenceRule | undefined = master.recurrence
+  if (!rule) return []
+  const { interval, unit, endDate } = rule
+  const maxDate = endDate
+    ? new Date(endDate)
+    : (() => { const d = new Date(master.date); d.setFullYear(d.getFullYear() + 2); return d })()
+  const instances: CalendarEvent[] = []
+  const cur = new Date(master.date)
+  for (let i = 0; i < 365; i++) {
+    if (unit === 'days')   cur.setDate(cur.getDate() + interval)
+    else if (unit === 'weeks')  cur.setDate(cur.getDate() + interval * 7)
+    else if (unit === 'months') cur.setMonth(cur.getMonth() + interval)
+    else if (unit === 'years')  cur.setFullYear(cur.getFullYear() + interval)
+    if (cur > maxDate) break
+    instances.push({ ...master, id: crypto.randomUUID(), date: cur.toISOString().slice(0, 10), recurrenceParentId: master.id, done: false })
+  }
+  return instances
+}
 
 const DEFAULT_CATS: Category[] = [
   { id: 'work',     name: 'עבודה',                    color: '#4285f4', icon: '💼', hidden: false, ring: 3, syncToGcal: true },
@@ -33,8 +53,10 @@ interface AppState {
 
   // Actions
   addEvent: (ev: Omit<CalendarEvent, 'id'>) => void
+  addRecurringEvent: (ev: Omit<CalendarEvent, 'id'>) => void
   updateEvent: (id: string, patch: Partial<CalendarEvent>) => void
   deleteEvent: (id: string) => void
+  deleteEventCascade: (id: string) => void
   setMode: (mode: ViewMode) => void
   setNeedle: (date: Date) => void
   setViewDate: (date: Date) => void
@@ -72,6 +94,12 @@ export const useAppStore = create<AppState>()(
           events: [...s.events, { ...ev, id: crypto.randomUUID() }],
         })),
 
+      addRecurringEvent: (ev) => {
+        const master: CalendarEvent = { ...ev, id: crypto.randomUUID() }
+        const instances = generateInstances(master)
+        set((s) => ({ events: [...s.events, master, ...instances] }))
+      },
+
       updateEvent: (id, patch) =>
         set((s) => ({
           events: s.events.map((e) => (e.id === id ? { ...e, ...patch } : e)),
@@ -79,6 +107,9 @@ export const useAppStore = create<AppState>()(
 
       deleteEvent: (id) =>
         set((s) => ({ events: s.events.filter((e) => e.id !== id) })),
+
+      deleteEventCascade: (id) =>
+        set((s) => ({ events: s.events.filter((e) => e.id !== id && e.recurrenceParentId !== id) })),
 
       setMode: (mode) => set({ mode, needle: new Date() }),
 

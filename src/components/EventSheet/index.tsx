@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useAppStore } from '../../store/useAppStore'
 import { useLang } from '../../hooks/useLang'
-import type { CalendarEvent } from '../../types'
+import type { CalendarEvent, RecurrenceRule } from '../../types'
 import * as gcal from '../../services/googleCalendar'
 
 interface Props {
@@ -58,7 +58,7 @@ const DEP_TYPES = [
 ] as const
 
 export default function EventSheet({ event, defaultDate, defaultItemType = 'event', forceItemType, onClose }: Props) {
-  const { addEvent, updateEvent, deleteEvent, categories, events: allEvents, gcalConnected, patchEventGcalId } = useAppStore()
+  const { addEvent, addRecurringEvent, updateEvent, deleteEvent, deleteEventCascade, categories, events: allEvents, gcalConnected, patchEventGcalId } = useAppStore()
   const { tr } = useLang()
   const isEdit = !!event
 
@@ -74,6 +74,12 @@ export default function EventSheet({ event, defaultDate, defaultItemType = 'even
   const [location, setLocation] = useState(event?.location ?? '')
   const [priority, setPriority] = useState<'L' | 'N' | 'H' | 'U'>(event?.priority ?? 'N')
 
+  // Recurrence state
+  const [showRecurrence, setShowRecurrence] = useState(!!(event?.recurrence))
+  const [recInterval, setRecInterval] = useState(event?.recurrence?.interval ?? 1)
+  const [recUnit, setRecUnit] = useState<RecurrenceRule['unit']>(event?.recurrence?.unit ?? 'weeks')
+  const [recEndDate, setRecEndDate] = useState(event?.recurrence?.endDate ?? '')
+
   // Dependency state
   const [showDep, setShowDep] = useState(!!(event?.dependsOn))
   const [dependsOn, setDependsOn] = useState(event?.dependsOn ?? '')
@@ -84,17 +90,22 @@ export default function EventSheet({ event, defaultDate, defaultItemType = 'even
 
   const save = async () => {
     if (!title.trim()) { setTitleError(true); return }
-    const cat = categories.find(c => c.id === categoryId)
     const evData = { title: title.trim(), date, time, endTime, note, location }
+    const recurrence: RecurrenceRule | undefined = showRecurrence
+      ? { interval: recInterval, unit: recUnit, ...(recEndDate ? { endDate: recEndDate } : {}) }
+      : undefined
     const data: Omit<CalendarEvent, 'id'> = {
       title: title.trim(), categoryId, date, time, endTime, note, location, priority,
       itemType: forceItemType ?? itemType, done: false, links: [], files: [],
       ...(showDep && dependsOn ? { dependsOn, dependsType, lag, lagForce } : {}),
+      ...(recurrence ? { recurrence } : {}),
     }
     if (isEdit && event) {
       updateEvent(event.id, data)
       if (gcalConnected && event.gcalId)
         gcal.updateEvent(event.gcalId, evData).catch(() => {})
+    } else if (recurrence) {
+      addRecurringEvent(data)
     } else {
       addEvent(data)
       if (gcalConnected) {
@@ -107,17 +118,16 @@ export default function EventSheet({ event, defaultDate, defaultItemType = 'even
     onClose()
   }
 
-  const convertToTask = () => {
-    if (event) {
-      updateEvent(event.id, { itemType: 'task' })
-    }
+  const convertTo = (type: 'event' | 'task') => {
+    if (event) updateEvent(event.id, { itemType: type })
     onClose()
   }
 
   const del = () => {
     if (event) {
       if (gcalConnected && event.gcalId) gcal.deleteEvent(event.gcalId).catch(() => {})
-      deleteEvent(event.id)
+      if (event.recurrence) deleteEventCascade(event.id)
+      else deleteEvent(event.id)
     }
     onClose()
   }
@@ -284,7 +294,7 @@ export default function EventSheet({ event, defaultDate, defaultItemType = 'even
           onClick={() => setShowDep(v => !v)}
           className="w-full flex items-center justify-between px-3 py-2 bg-gray-50 rounded-xl border border-gray-200 mb-2 text-sm font-bold text-gray-700"
         >
-          <span>{tr.linkEvent}</span>
+          <span>🔗 קישור לאירוע / מטלה</span>
           <span className="text-gray-400 text-base">{showDep ? '▲' : '▼'}</span>
         </button>
 
@@ -330,7 +340,7 @@ export default function EventSheet({ event, defaultDate, defaultItemType = 'even
                 <option value="">{tr.chooseEvent}</option>
                 {linkableEvents.map(e => (
                   <option key={e.id} value={e.id}>
-                    {e.title} ({e.date})
+                    {e.itemType === 'task' ? '✅ ' : '📅 '}{e.title} ({e.date})
                   </option>
                 ))}
               </select>
@@ -408,13 +418,66 @@ export default function EventSheet({ event, defaultDate, defaultItemType = 'even
           </div>
         )}
 
-        {/* Convert to task — shown when editing an event that is NOT already a task */}
-        {isEdit && !forceItemType && itemType === 'event' && (
+        {/* Recurrence */}
+        <button
+          onClick={() => setShowRecurrence(v => !v)}
+          className={`w-full flex items-center justify-between px-3 py-2 rounded-xl border mb-2 text-sm font-bold transition-all ${
+            showRecurrence ? 'bg-purple-500 text-white border-purple-500' : 'bg-gray-50 border-gray-200 text-gray-700'
+          }`}
+        >
+          <span>🔁 חוזר על עצמו</span>
+          <span className="text-xs opacity-70">{showRecurrence ? '▲' : '▼'}</span>
+        </button>
+
+        {showRecurrence && (
+          <div className="bg-purple-50 border border-purple-200 rounded-xl p-3 mb-3 flex flex-col gap-3">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold text-gray-600 whitespace-nowrap">כל</span>
+              <div className="flex items-center gap-1">
+                <button onClick={() => setRecInterval(n => Math.max(1, n - 1))}
+                  className="w-7 h-7 bg-white border border-gray-200 rounded-lg font-bold text-gray-600">−</button>
+                <span className="w-8 text-center font-mono font-bold text-sm">{recInterval}</span>
+                <button onClick={() => setRecInterval(n => n + 1)}
+                  className="w-7 h-7 bg-white border border-gray-200 rounded-lg font-bold text-gray-600">+</button>
+              </div>
+              <select
+                value={recUnit}
+                onChange={e => setRecUnit(e.target.value as RecurrenceRule['unit'])}
+                className="flex-1 bg-white border border-gray-200 rounded-lg px-2 py-1.5 text-sm outline-none"
+                dir="rtl"
+              >
+                <option value="days">ימים</option>
+                <option value="weeks">שבועות</option>
+                <option value="months">חודשים</option>
+                <option value="years">שנים</option>
+              </select>
+            </div>
+            <div>
+              <p className="text-xs font-bold text-gray-500 mb-1">עד תאריך (אופציונלי)</p>
+              <input type="date" value={recEndDate} onChange={e => setRecEndDate(e.target.value)}
+                className="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none" dir="ltr" />
+            </div>
+            {event?.recurrenceParentId && (
+              <p className="text-xs text-purple-600 font-bold">🔁 זוהי מופע של מטלה חוזרת</p>
+            )}
+          </div>
+        )}
+
+        {/* Convert buttons */}
+        {isEdit && (forceItemType ?? itemType) === 'event' && (
           <button
-            onClick={convertToTask}
+            onClick={() => convertTo('task')}
             className="w-full mb-2 py-3 bg-green-500 text-white rounded-xl text-sm font-extrabold flex items-center justify-center gap-2 shadow-sm"
           >
-            ✅ המר למטלה — יעבור למסך המטלות
+            ✅ המר למטלה
+          </button>
+        )}
+        {isEdit && (forceItemType ?? itemType) === 'task' && (
+          <button
+            onClick={() => convertTo('event')}
+            className="w-full mb-2 py-3 bg-blue-400 text-white rounded-xl text-sm font-extrabold flex items-center justify-center gap-2 shadow-sm"
+          >
+            📅 המר לאירוע
           </button>
         )}
 

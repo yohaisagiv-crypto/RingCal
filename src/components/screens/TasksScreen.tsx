@@ -115,10 +115,15 @@ export default function TasksScreen({ onBack }: Props) {
                   style={{ borderColor: cat?.color ?? '#888' }}
                 />
                 <div className="flex-1 min-w-0" onClick={() => setEditTask(task)}>
-                  <p className="text-sm font-bold text-gray-800 truncate">{task.title}</p>
+                  <p className="text-sm font-bold text-gray-800 truncate">
+                    {task.recurrence && <span className="text-purple-500 mr-1">🔁</span>}
+                    {task.recurrenceParentId && <span className="text-purple-400 mr-1 text-[10px]">↩</span>}
+                    {task.title}
+                  </p>
                   {task.date && (
                     <p className={`text-[10px] font-mono ${overdue ? 'text-red-500 font-bold' : 'text-gray-400'}`}>
                       {overdue ? '⚠️ ' : ''}{task.date}
+                      {task.recurrence && ` • כל ${task.recurrence.interval} ${task.recurrence.unit === 'days' ? 'ימים' : task.recurrence.unit === 'weeks' ? 'שבועות' : task.recurrence.unit === 'months' ? 'חודשים' : 'שנים'}`}
                     </p>
                   )}
                 </div>

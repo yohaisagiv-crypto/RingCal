@@ -11,6 +11,12 @@ export interface Category {
   skipDays?: number[]
 }
 
+export interface RecurrenceRule {
+  interval: number
+  unit: 'days' | 'weeks' | 'months' | 'years'
+  endDate?: string  // YYYY-MM-DD
+}
+
 export interface CalendarEvent {
   id: string
   title: string
@@ -34,6 +40,8 @@ export interface CalendarEvent {
   lagForce?: boolean // force timing by dependency
   gcalId?: string
   location?: string
+  recurrence?: RecurrenceRule
+  recurrenceParentId?: string  // id of master recurring event
 }
 
 export interface FileAttachment {
