@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>מחבר...</title>
+  <style>
+    body { margin: 0; display: flex; align-items: center; justify-content: center; height: 100vh; background: #f0f4ff; font-family: Arial, sans-serif; flex-direction: column; gap: 20px; }
+    a.btn { padding: 14px 28px; background: #4285f4; color: white; border-radius: 14px; text-decoration: none; font-size: 18px; font-weight: bold; }
+    p { font-size: 18px; color: #444; margin: 0; }
+  </style>
+</head>
+<body>
+<p id="msg">מחבר לאפליקציה...</p>
+<a id="btn" class="btn" style="display:none">פתח את RingCal</a>
+<script>
+  var hash = window.location.hash;
+  if (hash && hash.includes('access_token')) {
+    var params = hash.slice(1);
+    var intentUrl = 'intent://oauth?' + params + '#Intent;scheme=com.ringcal.app;package=com.spiraldiary.app;end;';
+    var btn = document.getElementById('btn');
+    btn.href = intentUrl;
+    btn.style.display = 'inline-block';
+    setTimeout(function() { window.location.href = intentUrl; }, 400);
+  } else {
+    document.getElementById('msg').textContent = 'שגיאה — נסה שוב';
+  }
+</script>
+</body>
+</html>
