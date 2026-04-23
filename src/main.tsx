@@ -2,21 +2,6 @@ import ReactDOM from 'react-dom/client'
 import { RouterProvider, createRouter } from '@tanstack/react-router'
 import { routeTree } from './routeTree.gen'
 
-// OAuth callback — handle BEFORE router renders
-if (window.location.pathname === '/oauth' && window.location.hash.includes('access_token')) {
-  const params = new URLSearchParams(window.location.hash.slice(1))
-  const token = params.get('access_token')
-  if (token) {
-    if (/Android/i.test(navigator.userAgent)) {
-      const queryParams = window.location.hash.slice(1)
-      window.location.href = 'intent://oauth?' + queryParams + '#Intent;scheme=com.ringcal.app;package=com.spiraldiary.app;end;'
-    } else {
-      window.opener?.postMessage(window.location.href, window.location.origin)
-      window.close()
-    }
-  }
-}
-
 // Capacitor — initialize on mobile
 async function initApp() {
   if ((window as unknown as { Capacitor?: { isNativePlatform?: () => boolean } }).Capacitor?.isNativePlatform?.()) {
