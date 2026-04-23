@@ -21,21 +21,45 @@ if ('serviceWorker' in navigator) {
   })
 }
 
-const router = createRouter({
-  routeTree,
-  defaultPreload: 'intent',
-  scrollRestoration: true,
-})
+const rootElement = document.getElementById('app')!
+
+// OAuth callback — bypass router entirely, show intent button
+if (window.location.pathname === '/oauth' && window.location.hash.includes('access_token')) {
+  const params = window.location.hash.slice(1)
+  const isAndroid = /Android/i.test(navigator.userAgent)
+  const intentUrl = `intent://oauth?${params}#Intent;scheme=com.ringcal.app;package=com.spiraldiary.app;end;`
+
+  if (isAndroid) {
+    setTimeout(() => { try { window.location.href = intentUrl } catch(_) {} }, 400)
+  } else {
+    window.opener?.postMessage(window.location.href, '*')
+    window.close()
+  }
+
+  const root = ReactDOM.createRoot(rootElement)
+  root.render(
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh', gap: 20, fontFamily: 'Arial, sans-serif', background: '#f0f4ff' }}>
+      <p style={{ fontSize: 18, color: '#444', margin: 0 }}>מחבר לאפליקציה...</p>
+      {isAndroid && (
+        <a href={intentUrl} style={{ padding: '14px 28px', background: '#4285f4', color: '#fff', borderRadius: 14, textDecoration: 'none', fontSize: 18, fontWeight: 'bold' }}>
+          פתח את RingCal
+        </a>
+      )}
+    </div>
+  )
+} else {
+  const router = createRouter({
+    routeTree,
+    defaultPreload: 'intent',
+    scrollRestoration: true,
+  })
+
+  const root = ReactDOM.createRoot(rootElement)
+  root.render(<RouterProvider router={router} />)
+}
 
 declare module '@tanstack/react-router' {
   interface Register {
-    router: typeof router
+    router: ReturnType<typeof createRouter>
   }
-}
-
-const rootElement = document.getElementById('app')!
-
-if (!rootElement.innerHTML) {
-  const root = ReactDOM.createRoot(rootElement)
-  root.render(<RouterProvider router={router} />)
 }
