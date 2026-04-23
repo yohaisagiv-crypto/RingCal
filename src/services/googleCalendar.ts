@@ -16,7 +16,7 @@ import { App } from '@capacitor/app'
 const CLIENT_ID   = import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined
 const SCOPE       = 'https://www.googleapis.com/auth/calendar'
 const isNative    = !!(window as unknown as { Capacitor?: { isNativePlatform?: () => boolean } }).Capacitor?.isNativePlatform?.()
-const REDIRECT    = isNative ? 'https://ringcal.vercel.app/oauth' : (window.location.origin + '/oauth')
+const REDIRECT    = isNative ? 'https://ring-cal.vercel.app/oauth' : (window.location.origin + '/oauth')
 console.log('[gcal] redirect_uri =', REDIRECT)
 const TOKEN_KEY   = 'gcal_token'
 const SYNC_KEY    = 'gcal_sync_from'
