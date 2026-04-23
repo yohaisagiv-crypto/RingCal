@@ -8,7 +8,8 @@ if (window.location.pathname === '/oauth' && window.location.hash.includes('acce
   const token = params.get('access_token')
   if (token) {
     if (/Android/i.test(navigator.userAgent)) {
-      window.location.href = 'com.ringcal.app://oauth' + window.location.hash
+      const queryParams = window.location.hash.slice(1)
+      window.location.href = 'intent://oauth?' + queryParams + '#Intent;scheme=com.ringcal.app;package=com.spiraldiary.app;end;'
     } else {
       window.opener?.postMessage(window.location.href, window.location.origin)
       window.close()
