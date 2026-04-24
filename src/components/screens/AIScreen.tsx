@@ -233,12 +233,11 @@ export default function AIScreen({ onBack }: Props) {
               <input
                 value={freeText}
                 onChange={e => setFreeText(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && !loading && freeText.trim() && ask()}
                 placeholder="כתוב את שאלתך כאן..."
                 className="w-full bg-white border-2 border-blue-200 rounded-xl px-3 py-3 text-base outline-none"
-                dir="rtl"
-                autoComplete="off"
-                autoCorrect="off"
+                type="text"
+                inputMode="text"
+                style={{ direction: 'rtl', unicodeBidi: 'plaintext' }}
               />
             )}
 
@@ -271,9 +270,14 @@ export default function AIScreen({ onBack }: Props) {
             )}
 
             {history.slice(0, -1).map((h, i) => (
-              <div key={i} className="bg-gray-50 rounded-2xl border border-gray-100 px-4 py-3 opacity-70">
+              <div key={i} className="bg-gray-50 rounded-2xl border border-gray-100 px-4 py-3">
                 <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-1">שאלה קודמת</p>
-                <p className="text-xs text-gray-500 mb-2 font-bold">"{h.q}"</p>
+                <button
+                  className="text-xs text-blue-500 mb-2 font-bold text-right w-full"
+                  onClick={() => { setSelectedQ('free'); setFreeText(h.q) }}
+                >
+                  ↺ "{h.q}"
+                </button>
                 <p className="text-xs text-gray-600 leading-relaxed whitespace-pre-wrap">{h.a}</p>
               </div>
             ))}

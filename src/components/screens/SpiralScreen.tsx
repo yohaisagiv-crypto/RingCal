@@ -17,6 +17,8 @@ interface Props {
 export default function SpiralScreen({ onNavigate }: Props) {
   const [sheetEvent, setSheetEvent] = useState<CalendarEvent | null>(null)
   const [addDate, setAddDate] = useState<Date | null>(null)
+  const [addType, setAddType] = useState<'event' | 'task'>('event')
+  const [showFabMenu, setShowFabMenu] = useState(false)
   const [showMenu, setShowMenu] = useState(false)
   const [showHelp, setShowHelp] = useState(false)
   const [showSearch, setShowSearch] = useState(false)
@@ -65,17 +67,40 @@ export default function SpiralScreen({ onNavigate }: Props) {
         onTapEvent={(ev) => { setSheetEvent(ev); setAddDate(null) }}
       />
 
+      {/* FAB menu */}
+      {showFabMenu && (
+        <>
+          <div className="absolute inset-0 z-30" onClick={() => setShowFabMenu(false)} />
+          <div className="absolute bottom-20 left-4 flex flex-col gap-2 z-40">
+            <button
+              onClick={() => { setShowFabMenu(false); setAddType('task'); setAddDate(needle); setSheetEvent(null) }}
+              className="flex items-center gap-2 px-4 py-2.5 bg-white rounded-full shadow-lg text-sm font-extrabold text-gray-700 border border-gray-200"
+            >
+              <span className="w-7 h-7 rounded-full bg-green-500 text-white flex items-center justify-center text-base font-black">✅</span>
+              מטלה חדשה
+            </button>
+            <button
+              onClick={() => { setShowFabMenu(false); setAddType('event'); setAddDate(needle); setSheetEvent(null) }}
+              className="flex items-center gap-2 px-4 py-2.5 bg-white rounded-full shadow-lg text-sm font-extrabold text-gray-700 border border-gray-200"
+            >
+              <span className="w-7 h-7 rounded-full bg-blue-500 text-white flex items-center justify-center text-base font-black">📅</span>
+              אירוע חדש
+            </button>
+          </div>
+        </>
+      )}
+
       {/* FAB */}
       <button
-        onClick={() => setAddDate(needle)}
-        className="absolute bottom-4 left-4 rounded-full bg-blue-500 text-white text-3xl shadow-lg flex items-center justify-center z-30"
+        onClick={() => setShowFabMenu(v => !v)}
+        className={`absolute bottom-4 left-4 rounded-full text-white text-3xl shadow-lg flex items-center justify-center z-30 transition-all ${showFabMenu ? 'bg-red-500 rotate-45' : 'bg-blue-500'}`}
         style={{ width: 52, height: 52 }}
       >
         +
       </button>
 
       {(sheetEvent || addDate) && (
-        <EventSheet event={sheetEvent} defaultDate={addDate} onClose={closeSheet} />
+        <EventSheet event={sheetEvent} defaultDate={addDate} defaultItemType={addType} onClose={closeSheet} />
       )}
 
       {/* Menu overlay */}

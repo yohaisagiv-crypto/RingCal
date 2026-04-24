@@ -61,6 +61,13 @@ export default function EventSheet({ event, defaultDate, defaultItemType = 'even
   const { addEvent, addRecurringEvent, updateEvent, deleteEvent, deleteEventCascade, categories, events: allEvents, gcalConnected, patchEventGcalId } = useAppStore()
   const { tr } = useLang()
   const isEdit = !!event
+  const effectiveType = forceItemType ?? (event?.itemType ?? defaultItemType)
+  const isTask = effectiveType === 'task'
+  const sheetTitle = isTask
+    ? (isEdit ? 'עריכת מטלה' : 'הוספת מטלה')
+    : (isEdit ? tr.editEvent : tr.addEvent)
+  const nameLabel = isTask ? 'שם המטלה' : tr.eventName
+  const namePlaceholder = isTask ? 'מה צריך לעשות?' : tr.whatPlanned
 
   const [itemType, setItemType] = useState<'event' | 'task'>(forceItemType ?? event?.itemType ?? defaultItemType)
   const [title, setTitle] = useState(event?.title ?? '')
@@ -186,7 +193,7 @@ export default function EventSheet({ event, defaultDate, defaultItemType = 'even
             ×
           </button>
           <span className="font-mono text-sm font-bold text-blue-500 flex-1 text-center">
-            {isEdit ? tr.editEvent : tr.addEvent}
+            {sheetTitle}
           </span>
           {isEdit && (
             <button onClick={del} className="border border-red-400 text-red-500 text-xs rounded-lg px-3 py-1">
@@ -215,12 +222,12 @@ export default function EventSheet({ event, defaultDate, defaultItemType = 'even
         </div>
 
         {/* Title */}
-        <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">{tr.eventName}</p>
+        <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">{nameLabel}</p>
         {titleError && <p className="text-xs text-red-500 font-bold mb-1">{tr.titleRequired}</p>}
         <input
           value={title}
           onChange={e => { setTitle(e.target.value); setTitleError(false) }}
-          placeholder={tr.whatPlanned}
+          placeholder={namePlaceholder}
           className={`w-full bg-gray-50 border-2 rounded-xl px-3 py-2.5 text-base font-bold text-gray-800 outline-none mb-3 ${titleError ? 'border-red-400 bg-red-50' : 'border-blue-300'}`}
           dir="rtl"
           autoFocus
