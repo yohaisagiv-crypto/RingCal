@@ -3,7 +3,7 @@ import { useAppStore } from '../../store/useAppStore'
 import { useLang } from '../../hooks/useLang'
 import type { CalendarEvent, RecurrenceRule } from '../../types'
 import * as gcal from '../../services/googleCalendar'
-
+import { NativeInput, NativeTextarea } from '../NativeInput'
 interface Props {
   event: CalendarEvent | null
   defaultDate: Date | null
@@ -224,9 +224,9 @@ export default function EventSheet({ event, defaultDate, defaultItemType = 'even
         {/* Title */}
         <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">{nameLabel}</p>
         {titleError && <p className="text-xs text-red-500 font-bold mb-1">{tr.titleRequired}</p>}
-        <input
+        <NativeInput
           value={title}
-          onChange={e => { setTitle(e.target.value); setTitleError(false) }}
+          onChange={v => { setTitle(v); setTitleError(false) }}
           placeholder={namePlaceholder}
           className={`w-full bg-gray-50 border-2 rounded-xl px-3 py-2.5 text-base font-bold text-gray-800 outline-none mb-3 ${titleError ? 'border-red-400 bg-red-50' : 'border-blue-300'}`}
           dir="rtl"
@@ -287,16 +287,16 @@ export default function EventSheet({ event, defaultDate, defaultItemType = 'even
 
         {/* Note */}
         <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">{tr.notes}</p>
-        <textarea value={note} onChange={e => setNote(e.target.value)}
+        <NativeTextarea value={note} onChange={setNote}
           placeholder={tr.notes_ph} rows={2}
           className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none resize-none mb-3"
           dir="rtl" />
 
         {/* Location */}
         <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">📍 מיקום</p>
-        <input
+        <NativeInput
           value={location}
-          onChange={e => setLocation(e.target.value)}
+          onChange={setLocation}
           placeholder="כתובת או שם מקום..."
           className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none mb-2"
           dir="rtl"
