@@ -7,37 +7,20 @@ interface Props extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'onCha
 
 export function NativeInput({ value, onChange, ...props }: Props) {
   const ref = useRef<HTMLInputElement>(null)
+  const onChangeRef = useRef(onChange)
+  onChangeRef.current = onChange
 
-  // Set initial value on mount only
-  useEffect(() => {
-    if (ref.current) ref.current.value = value
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Listen via native DOM event — bypasses React synthetic event issues with Android IME
+  // Set up listener once — React never touches el.value again
   useEffect(() => {
     const el = ref.current
     if (!el) return
-    // requestAnimationFrame gives the IME time to finish updating el.value before we read it
-    const onInput = () => requestAnimationFrame(() => onChange(el.value))
-    const onCompose = () => requestAnimationFrame(() => onChange(el.value))
-    el.addEventListener('input', onInput)
-    el.addEventListener('compositionupdate', onCompose)
-    el.addEventListener('compositionend', onCompose)
-    return () => {
-      el.removeEventListener('input', onInput)
-      el.removeEventListener('compositionupdate', onCompose)
-      el.removeEventListener('compositionend', onCompose)
-    }
-  }, [onChange])
+    const handler = (e: Event) => onChangeRef.current((e.target as HTMLInputElement).value)
+    el.addEventListener('input', handler)
+    return () => el.removeEventListener('input', handler)
+  }, [])
 
-  // Sync value from outside only when not focused
-  useEffect(() => {
-    const el = ref.current
-    if (el && document.activeElement !== el) el.value = value
-  })
-
-  // No value/defaultValue prop — React never touches el.value
-  return <input ref={ref} {...props} />
+  // defaultValue sets initial value; React does NOT update it on re-renders
+  return <input ref={ref} defaultValue={value} {...props} />
 }
 
 interface TAProps extends Omit<React.TextareaHTMLAttributes<HTMLTextAreaElement>, 'onChange' | 'value'> {
@@ -47,30 +30,16 @@ interface TAProps extends Omit<React.TextareaHTMLAttributes<HTMLTextAreaElement>
 
 export function NativeTextarea({ value, onChange, ...props }: TAProps) {
   const ref = useRef<HTMLTextAreaElement>(null)
-
-  useEffect(() => {
-    if (ref.current) ref.current.value = value
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  const onChangeRef = useRef(onChange)
+  onChangeRef.current = onChange
 
   useEffect(() => {
     const el = ref.current
     if (!el) return
-    const onInput = () => requestAnimationFrame(() => onChange(el.value))
-    const onCompose = () => requestAnimationFrame(() => onChange(el.value))
-    el.addEventListener('input', onInput)
-    el.addEventListener('compositionupdate', onCompose)
-    el.addEventListener('compositionend', onCompose)
-    return () => {
-      el.removeEventListener('input', onInput)
-      el.removeEventListener('compositionupdate', onCompose)
-      el.removeEventListener('compositionend', onCompose)
-    }
-  }, [onChange])
+    const handler = (e: Event) => onChangeRef.current((e.target as HTMLTextAreaElement).value)
+    el.addEventListener('input', handler)
+    return () => el.removeEventListener('input', handler)
+  }, [])
 
-  useEffect(() => {
-    const el = ref.current
-    if (el && document.activeElement !== el) el.value = value
-  })
-
-  return <textarea ref={ref} {...props} />
+  return <textarea ref={ref} defaultValue={value} {...props} />
 }
