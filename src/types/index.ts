@@ -23,8 +23,10 @@ export interface CalendarEvent {
   itemType?: 'event' | 'task'
   categoryId: string
   date: string       // ISO date string YYYY-MM-DD
+  endDate?: string   // YYYY-MM-DD (for multi-day tasks/events)
   time?: string      // HH:MM
   endTime?: string   // HH:MM
+  allDay?: boolean
   durationDays?: number
   durationHours?: number
   durationMinutes?: number

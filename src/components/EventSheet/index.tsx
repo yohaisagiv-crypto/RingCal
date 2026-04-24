@@ -68,8 +68,10 @@ export default function EventSheet({ event, defaultDate, defaultItemType = 'even
   const [date, setDate] = useState(
     event?.date ?? defaultDate?.toISOString().slice(0, 10) ?? new Date().toISOString().slice(0, 10)
   )
+  const [endDate, setEndDate] = useState(event?.endDate ?? '')
   const [time, setTime] = useState(event?.time ?? '')
   const [endTime, setEndTime] = useState(event?.endTime ?? '')
+  const [allDay, setAllDay] = useState(event?.allDay ?? false)
   const [note, setNote] = useState(event?.note ?? '')
   const [location, setLocation] = useState(event?.location ?? '')
   const [priority, setPriority] = useState<'L' | 'N' | 'H' | 'U'>(event?.priority ?? 'N')
@@ -96,6 +98,8 @@ export default function EventSheet({ event, defaultDate, defaultItemType = 'even
       : undefined
     const data: Omit<CalendarEvent, 'id'> = {
       title: title.trim(), categoryId, date, time, endTime, note, location, priority,
+      ...(endDate ? { endDate } : {}),
+      ...(allDay ? { allDay: true } : {}),
       itemType: forceItemType ?? itemType, done: false, links: [], files: [],
       ...(showDep && dependsOn ? { dependsOn, dependsType, lag, lagForce } : {}),
       ...(recurrence ? { recurrence } : {}),
@@ -223,23 +227,43 @@ export default function EventSheet({ event, defaultDate, defaultItemType = 'even
         />
 
         {/* Date + Time */}
-        <div className="flex gap-2 mb-3">
+        <div className="flex gap-2 mb-2">
           <div className="flex-1">
             <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">{tr.date}</p>
             <input type="date" value={date} onChange={e => setDate(e.target.value)}
               className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none" dir="ltr" />
           </div>
           <div className="flex-1">
-            <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">{tr.startTime}</p>
-            <input type="time" value={time} onChange={e => setTime(e.target.value)}
-              className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none" dir="ltr" />
-          </div>
-          <div className="flex-1">
-            <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">{tr.endTime}</p>
-            <input type="time" value={endTime} onChange={e => setEndTime(e.target.value)}
+            <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">תאריך סיום</p>
+            <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)}
               className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none" dir="ltr" />
           </div>
         </div>
+
+        {/* All-day toggle (events only) + time fields */}
+        {(forceItemType ?? itemType) === 'event' && (
+          <button
+            onClick={() => setAllDay(v => !v)}
+            className={`flex items-center gap-2 px-3 py-2 rounded-xl border text-sm font-bold mb-2 transition-all ${allDay ? 'bg-blue-500 text-white border-blue-500' : 'bg-gray-50 border-gray-200 text-gray-600'}`}
+          >
+            <span>{allDay ? '☑️' : '☐'}</span> אירוע כל היום
+          </button>
+        )}
+
+        {!(allDay && (forceItemType ?? itemType) === 'event') && (
+          <div className="flex gap-2 mb-3">
+            <div className="flex-1">
+              <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">{tr.startTime}</p>
+              <input type="time" value={time} onChange={e => setTime(e.target.value)}
+                className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none" dir="ltr" />
+            </div>
+            <div className="flex-1">
+              <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">{tr.endTime}</p>
+              <input type="time" value={endTime} onChange={e => setEndTime(e.target.value)}
+                className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none" dir="ltr" />
+            </div>
+          </div>
+        )}
 
         {/* Priority */}
         <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">{tr.priority}</p>

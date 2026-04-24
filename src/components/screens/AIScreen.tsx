@@ -74,6 +74,7 @@ export default function AIScreen({ onBack }: Props) {
   const { events, categories, settings, updateSettings } = useAppStore()
   const [selectedQ, setSelectedQ] = useState<string | null>(null)
   const [freeText, setFreeText] = useState('')
+  const [history, setHistory] = useState<{ q: string; a: string }[]>([])
   const [answer, setAnswer] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -95,9 +96,12 @@ export default function AIScreen({ onBack }: Props) {
     if (!apiKey) { setShowSetup(true); return }
     const context = buildContext(events, categories)
     const fullPrompt = `${context}\n\n${questionText}\n\nענה בעברית, בצורה תמציתית ומעשית.`
-    setLoading(true); setAnswer(''); setError('')
+    setLoading(true); setError('')
     try {
-      setAnswer(await callGemini(apiKey, fullPrompt))
+      const newAnswer = await callGemini(apiKey, fullPrompt)
+      setHistory(h => [...h, { q: questionText, a: newAnswer }])
+      setAnswer(newAnswer)
+      if (selectedQ === 'free') setFreeText('')
     } catch (e) {
       setError(e instanceof Error ? e.message : 'שגיאה לא ידועה')
     } finally {
@@ -226,13 +230,15 @@ export default function AIScreen({ onBack }: Props) {
             </div>
 
             {selectedQ === 'free' && (
-              <textarea
+              <input
                 value={freeText}
                 onChange={e => setFreeText(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && !loading && freeText.trim() && ask()}
                 placeholder="כתוב את שאלתך כאן..."
-                rows={3}
-                className="w-full bg-white border-2 border-blue-200 rounded-xl px-3 py-2 text-sm outline-none resize-none"
+                className="w-full bg-white border-2 border-blue-200 rounded-xl px-3 py-3 text-base outline-none"
                 dir="rtl"
+                autoComplete="off"
+                autoCorrect="off"
               />
             )}
 
@@ -264,6 +270,14 @@ export default function AIScreen({ onBack }: Props) {
               </div>
             )}
 
+            {history.slice(0, -1).map((h, i) => (
+              <div key={i} className="bg-gray-50 rounded-2xl border border-gray-100 px-4 py-3 opacity-70">
+                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-1">שאלה קודמת</p>
+                <p className="text-xs text-gray-500 mb-2 font-bold">"{h.q}"</p>
+                <p className="text-xs text-gray-600 leading-relaxed whitespace-pre-wrap">{h.a}</p>
+              </div>
+            ))}
+
             {answer && (
               <div className="bg-white rounded-2xl border border-gray-100 shadow-sm px-4 py-4">
                 <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-2">תשובת Gemini</p>
@@ -288,12 +302,22 @@ export default function AIScreen({ onBack }: Props) {
                   </div>
                 )}
 
-                <button
-                  onClick={() => { setAnswer(''); setSelectedQ(null); setFreeText('') }}
-                  className="mt-4 w-full py-3 bg-blue-50 border border-blue-200 rounded-xl text-sm font-extrabold text-blue-600"
-                >
-                  ↺ שאלה חדשה
-                </button>
+                <div className="flex gap-2 mt-4">
+                  {selectedQ === 'free' && (
+                    <button
+                      onClick={() => { setAnswer(''); setHistory([]); setSelectedQ(null); setFreeText('') }}
+                      className="flex-1 py-3 bg-gray-100 border border-gray-200 rounded-xl text-sm font-extrabold text-gray-600"
+                    >
+                      ✕ נקה הכל
+                    </button>
+                  )}
+                  <button
+                    onClick={() => { setAnswer(''); setSelectedQ(null); setFreeText(''); setHistory([]) }}
+                    className="flex-1 py-3 bg-blue-50 border border-blue-200 rounded-xl text-sm font-extrabold text-blue-600"
+                  >
+                    ↺ שאלה חדשה
+                  </button>
+                </div>
               </div>
             )}
           </>

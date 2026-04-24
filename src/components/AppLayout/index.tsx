@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 
 function RingCalIcon({ active }: { active: boolean }) {
   return (
@@ -23,6 +23,20 @@ export default function AppLayout() {
   const [page, setPage] = useState(0)
   const touchStartX = useRef<number | null>(null)
   const { bumpSpiralGeneration } = useAppStore()
+
+  useEffect(() => {
+    let handler: { remove: () => void } | null = null
+    const cap = (window as unknown as { Capacitor?: { isNativePlatform?: () => boolean } }).Capacitor
+    if (cap?.isNativePlatform?.()) {
+      import('@capacitor/app').then(({ App }) => {
+        App.addListener('backButton', () => {
+          if (page === 0) App.exitApp()
+          else navigateTo(0)
+        }).then(h => { handler = h })
+      })
+    }
+    return () => { handler?.remove() }
+  }, [page])
 
   const navigateTo = useCallback((p: number) => {
     setPage(p)
