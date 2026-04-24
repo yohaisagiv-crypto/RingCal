@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useAppStore } from '../../store/useAppStore'
 import type { CalendarEvent } from '../../types'
 import EventSheet from '../EventSheet'
@@ -12,6 +12,9 @@ export default function TasksScreen({ onBack }: Props) {
   const [newTitle, setNewTitle] = useState('')
   const [newDate, setNewDate] = useState(new Date().toISOString().slice(0, 10))
   const [newCat, setNewCat] = useState(categories[0]?.id ?? '')
+  useEffect(() => {
+    if (!categories.find(c => c.id === newCat)) setNewCat(categories[0]?.id ?? '')
+  }, [categories])
   const [reactivateTask, setReactivateTask] = useState<CalendarEvent | null>(null)
   const [newDueDate, setNewDueDate] = useState('')
 

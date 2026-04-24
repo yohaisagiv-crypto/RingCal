@@ -11,13 +11,14 @@ function generateInstances(master: CalendarEvent): CalendarEvent[] {
     : (() => { const d = new Date(master.date); d.setFullYear(d.getFullYear() + 2); return d })()
   const instances: CalendarEvent[] = []
   const cur = new Date(master.date)
-  for (let i = 0; i < 365; i++) {
+  while (true) {
     if (unit === 'days')   cur.setDate(cur.getDate() + interval)
     else if (unit === 'weeks')  cur.setDate(cur.getDate() + interval * 7)
     else if (unit === 'months') cur.setMonth(cur.getMonth() + interval)
     else if (unit === 'years')  cur.setFullYear(cur.getFullYear() + interval)
     if (cur > maxDate) break
     instances.push({ ...master, id: crypto.randomUUID(), date: cur.toISOString().slice(0, 10), recurrenceParentId: master.id, done: false })
+    if (instances.length >= 1000) break // safety cap
   }
   return instances
 }

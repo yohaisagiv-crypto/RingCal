@@ -99,14 +99,15 @@ export default function EventSheet({ event, defaultDate, defaultItemType = 'even
 
   const save = async () => {
     if (!title.trim()) { setTitleError(true); return }
+    if (endDate && endDate < date) { setEndDate(date); return }
     const evData = { title: title.trim(), date, time, endTime, note, location }
     const recurrence: RecurrenceRule | undefined = showRecurrence
       ? { interval: recInterval, unit: recUnit, ...(recEndDate ? { endDate: recEndDate } : {}) }
       : undefined
     const data: Omit<CalendarEvent, 'id'> = {
-      title: title.trim(), categoryId, date, time, endTime, note, location, priority,
-      ...(endDate ? { endDate } : {}),
-      ...(allDay ? { allDay: true } : {}),
+      title: title.trim(), categoryId, date, note, location, priority,
+      ...(allDay ? { allDay: true } : { time: time || undefined, endTime: endTime || undefined }),
+      ...(endDate && endDate >= date ? { endDate } : {}),
       itemType: forceItemType ?? itemType, done: false, links: [], files: [],
       ...(showDep && dependsOn ? { dependsOn, dependsType, lag, lagForce } : {}),
       ...(recurrence ? { recurrence } : {}),

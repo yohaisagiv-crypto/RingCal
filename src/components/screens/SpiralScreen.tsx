@@ -28,26 +28,25 @@ export default function SpiralScreen({ onNavigate }: Props) {
 
   const closeSheet = () => { setSheetEvent(null); setAddDate(null) }
 
-  const pullFromGcal = async () => {
-    if (!gcalConnected || !gcal.isConnected()) return
-    try {
-      const since = new Date(new Date().getFullYear() - 3, 0, 1)
-      const gcalEvents = await gcal.fetchFutureEvents(since)
-      const existingIds = new Set(events.map(e => e.gcalId).filter(Boolean))
-      for (const ge of gcalEvents) {
-        if (existingIds.has(ge.id)) continue
-        const imported = gcal.fromGcalEvent(ge)
-        const cat = categories[0]?.id ?? ''
-        addEvent({ ...imported, categoryId: cat, priority: 'N', done: false, links: [], files: [] })
-        const newEv = useAppStore.getState().events.find(e => e.title === imported.title && e.date === imported.date && !e.gcalId)
-        if (newEv) patchEventGcalId(newEv.id, ge.id)
-      }
-    } catch { /* silent */ }
-  }
-
   useEffect(() => {
-    pullFromGcal()
-    const onVisible = () => { if (document.visibilityState === 'visible') pullFromGcal() }
+    const pull = async () => {
+      if (!gcalConnected || !gcal.isConnected()) return
+      try {
+        const since = new Date(new Date().getFullYear() - 3, 0, 1)
+        const gcalEvents = await gcal.fetchFutureEvents(since)
+        const existingIds = new Set(useAppStore.getState().events.map(e => e.gcalId).filter(Boolean))
+        for (const ge of gcalEvents) {
+          if (existingIds.has(ge.id)) continue
+          const imported = gcal.fromGcalEvent(ge)
+          const cat = useAppStore.getState().categories[0]?.id ?? ''
+          useAppStore.getState().addEvent({ ...imported, categoryId: cat, priority: 'N', done: false, links: [], files: [] })
+          const newEv = useAppStore.getState().events.find(e => e.title === imported.title && e.date === imported.date && !e.gcalId)
+          if (newEv) useAppStore.getState().patchEventGcalId(newEv.id, ge.id)
+        }
+      } catch { /* silent */ }
+    }
+    pull()
+    const onVisible = () => { if (document.visibilityState === 'visible') pull() }
     document.addEventListener('visibilitychange', onVisible)
     return () => document.removeEventListener('visibilitychange', onVisible)
   }, [gcalConnected])

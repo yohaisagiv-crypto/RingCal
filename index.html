@@ -14,22 +14,6 @@
   </head>
   <body>
     <div id="app"></div>
-    <script>
-      // Fix Android IME backspace (deleteSurroundingText) not triggering React onChange
-      if (/Android/i.test(navigator.userAgent)) {
-        var inputProto = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')
-        var taProto = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')
-        document.addEventListener('input', function(e) {
-          var target = e.target
-          if (!target || (target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA')) return
-          var proto = target.tagName === 'INPUT' ? inputProto : taProto
-          if (proto && proto.set) {
-            proto.set.call(target, target.value)
-            target.dispatchEvent(new Event('input', { bubbles: true }))
-          }
-        }, true)
-      }
-    </script>
-    <script type="module" src="/src/main.tsx"></script>
+<script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

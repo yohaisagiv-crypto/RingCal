@@ -20,7 +20,7 @@ export interface RecurrenceRule {
 export interface CalendarEvent {
   id: string
   title: string
-  itemType?: 'event' | 'task'
+  itemType: 'event' | 'task'
   categoryId: string
   date: string       // ISO date string YYYY-MM-DD
   endDate?: string   // YYYY-MM-DD (for multi-day tasks/events)

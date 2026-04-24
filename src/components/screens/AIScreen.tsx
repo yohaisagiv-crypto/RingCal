@@ -305,22 +305,12 @@ export default function AIScreen({ onBack }: Props) {
                   </div>
                 )}
 
-                <div className="flex gap-2 mt-4">
-                  {selectedQ === 'free' && (
-                    <button
-                      onClick={() => { setAnswer(''); setHistory([]); setSelectedQ(null); setFreeText('') }}
-                      className="flex-1 py-3 bg-gray-100 border border-gray-200 rounded-xl text-sm font-extrabold text-gray-600"
-                    >
-                      ✕ נקה הכל
-                    </button>
-                  )}
-                  <button
-                    onClick={() => { setAnswer(''); setSelectedQ(null); setFreeText(''); setHistory([]) }}
-                    className="flex-1 py-3 bg-blue-50 border border-blue-200 rounded-xl text-sm font-extrabold text-blue-600"
-                  >
-                    ↺ שאלה חדשה
-                  </button>
-                </div>
+                <button
+                  onClick={() => { setAnswer(''); setSelectedQ(null); setFreeText(''); setHistory([]) }}
+                  className="mt-4 w-full py-3 bg-blue-50 border border-blue-200 rounded-xl text-sm font-extrabold text-blue-600"
+                >
+                  ↺ שאלה חדשה
+                </button>
               </div>
             )}
           </>
