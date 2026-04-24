@@ -17,12 +17,15 @@ export function NativeInput({ value, onChange, ...props }: Props) {
   useEffect(() => {
     const el = ref.current
     if (!el) return
-    const onInput = () => onChange(el.value)
-    const onCompose = () => onChange(el.value)
+    // requestAnimationFrame gives the IME time to finish updating el.value before we read it
+    const onInput = () => requestAnimationFrame(() => onChange(el.value))
+    const onCompose = () => requestAnimationFrame(() => onChange(el.value))
     el.addEventListener('input', onInput)
+    el.addEventListener('compositionupdate', onCompose)
     el.addEventListener('compositionend', onCompose)
     return () => {
       el.removeEventListener('input', onInput)
+      el.removeEventListener('compositionupdate', onCompose)
       el.removeEventListener('compositionend', onCompose)
     }
   }, [onChange])
@@ -52,12 +55,14 @@ export function NativeTextarea({ value, onChange, ...props }: TAProps) {
   useEffect(() => {
     const el = ref.current
     if (!el) return
-    const onInput = () => onChange(el.value)
-    const onCompose = () => onChange(el.value)
+    const onInput = () => requestAnimationFrame(() => onChange(el.value))
+    const onCompose = () => requestAnimationFrame(() => onChange(el.value))
     el.addEventListener('input', onInput)
+    el.addEventListener('compositionupdate', onCompose)
     el.addEventListener('compositionend', onCompose)
     return () => {
       el.removeEventListener('input', onInput)
+      el.removeEventListener('compositionupdate', onCompose)
       el.removeEventListener('compositionend', onCompose)
     }
   }, [onChange])
