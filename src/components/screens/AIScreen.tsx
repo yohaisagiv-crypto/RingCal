@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import { NativeInput } from '../NativeInput'
 import { useAppStore } from '../../store/useAppStore'
 import EventSheet from '../EventSheet'
 import type { CalendarEvent } from '../../types'
@@ -189,9 +188,9 @@ export default function AIScreen({ onBack }: Props) {
 
             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
               <p className="font-extrabold text-sm text-gray-700 mb-2">שלב 4 — הדבק את המפתח כאן:</p>
-              <NativeInput
+              <input
                 value={keyDraft}
-                onChange={setKeyDraft}
+                onChange={e => setKeyDraft(e.target.value)}
                 placeholder="AIzaSy..."
                 className="w-full bg-gray-50 border-2 border-blue-300 rounded-xl px-3 py-2.5 text-sm outline-none font-mono mb-3"
                 dir="ltr"
@@ -230,13 +229,13 @@ export default function AIScreen({ onBack }: Props) {
             </div>
 
             {selectedQ === 'free' && (
-              <NativeInput
+              <input
                 value={freeText}
-                onChange={setFreeText}
+                onChange={e => setFreeText(e.target.value)}
                 placeholder="כתוב את שאלתך כאן..."
                 className="w-full bg-white border-2 border-blue-200 rounded-xl px-3 py-3 text-base outline-none"
                 type="text"
-                style={{ direction: 'rtl' }}
+                dir="rtl"
               />
             )}
 
