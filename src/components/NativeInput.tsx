@@ -5,6 +5,18 @@ interface Props extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'onCha
   onChange: (val: string) => void
 }
 
+function makeListener(el: HTMLInputElement | HTMLTextAreaElement, onChangeRef: React.MutableRefObject<(v: string) => void>) {
+  return (e: Event) => {
+    const ie = e as InputEvent
+    if (ie.inputType === 'deleteContentBackward' || ie.inputType === 'deleteContentForward') {
+      // queueMicrotask gives the DOM time to finish the deletion before we read the value
+      queueMicrotask(() => onChangeRef.current(el.value))
+    } else {
+      onChangeRef.current(el.value)
+    }
+  }
+}
+
 export function NativeInput({ value, onChange, ...props }: Props) {
   const ref = useRef<HTMLInputElement>(null)
   const onChangeRef = useRef(onChange)
@@ -13,25 +25,9 @@ export function NativeInput({ value, onChange, ...props }: Props) {
   useEffect(() => {
     const el = ref.current
     if (!el) return
-
-    const onBeforeInput = (e: InputEvent) => {
-      if (e.inputType === 'deleteContentBackward' || e.inputType === 'deleteContentForward') {
-        queueMicrotask(() => onChangeRef.current(el.value))
-      }
-    }
-    const onInput = (e: Event) => {
-      const ie = e as InputEvent
-      if (ie.inputType !== 'deleteContentBackward' && ie.inputType !== 'deleteContentForward') {
-        onChangeRef.current(el.value)
-      }
-    }
-
-    el.addEventListener('beforeinput', onBeforeInput)
-    el.addEventListener('input', onInput)
-    return () => {
-      el.removeEventListener('beforeinput', onBeforeInput)
-      el.removeEventListener('input', onInput)
-    }
+    const handler = makeListener(el, onChangeRef)
+    el.addEventListener('input', handler)
+    return () => el.removeEventListener('input', handler)
   }, [])
 
   useEffect(() => {
@@ -55,25 +51,9 @@ export function NativeTextarea({ value, onChange, ...props }: TAProps) {
   useEffect(() => {
     const el = ref.current
     if (!el) return
-
-    const onBeforeInput = (e: InputEvent) => {
-      if (e.inputType === 'deleteContentBackward' || e.inputType === 'deleteContentForward') {
-        queueMicrotask(() => onChangeRef.current(el.value))
-      }
-    }
-    const onInput = (e: Event) => {
-      const ie = e as InputEvent
-      if (ie.inputType !== 'deleteContentBackward' && ie.inputType !== 'deleteContentForward') {
-        onChangeRef.current(el.value)
-      }
-    }
-
-    el.addEventListener('beforeinput', onBeforeInput)
-    el.addEventListener('input', onInput)
-    return () => {
-      el.removeEventListener('beforeinput', onBeforeInput)
-      el.removeEventListener('input', onInput)
-    }
+    const handler = makeListener(el, onChangeRef)
+    el.addEventListener('input', handler)
+    return () => el.removeEventListener('input', handler)
   }, [])
 
   useEffect(() => {
