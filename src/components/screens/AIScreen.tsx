@@ -194,8 +194,8 @@ export default function AIScreen({ onBack }: Props) {
                 placeholder="AIzaSy..."
                 className="w-full bg-gray-50 border-2 border-blue-300 rounded-xl px-3 py-2.5 text-sm outline-none font-mono mb-3"
                 dir="ltr"
-                type="password"
-                autoComplete="off"
+                type="text"
+                inputMode="text"
               />
               <button
                 onClick={saveKey}
