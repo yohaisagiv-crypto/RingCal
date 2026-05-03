@@ -14,10 +14,9 @@ import { Browser } from '@capacitor/browser'
 import { App } from '@capacitor/app'
 
 const CLIENT_ID   = import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined
-const SCOPE       = 'https://www.googleapis.com/auth/calendar'
+const SCOPE       = 'https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/drive.appdata'
 const isNative    = !!(window as unknown as { Capacitor?: { isNativePlatform?: () => boolean } }).Capacitor?.isNativePlatform?.()
-const REDIRECT    = isNative ? 'https://ring-cal.vercel.app/oauth' : (window.location.origin + '/oauth')
-console.log('[gcal] redirect_uri =', REDIRECT)
+const REDIRECT    = isNative ? 'https://spiral-diary.vercel.app/oauth' : (window.location.origin + '/oauth')
 const TOKEN_KEY   = 'gcal_token'
 const SYNC_KEY    = 'gcal_sync_from'
 
@@ -90,7 +89,7 @@ export function authorize(): Promise<string> {
       reject(new Error('פג הזמן — נסה שוב'))
     }, 3 * 60 * 1000)
 
-    resolve = ((orig) => (token: string) => {
+    resolve = ((orig) => (token: string | PromiseLike<string>) => {
       clearTimeout(timeout)
       window.removeEventListener('message', onMessage)
       orig(token)
@@ -129,6 +128,8 @@ export type GcalEventRaw = {
   status?: string
   start: { dateTime?: string; date?: string }
   end?: { dateTime?: string; date?: string }
+  attendees?: { self?: boolean; responseStatus?: 'needsAction' | 'accepted' | 'declined' | 'tentative' }[]
+  organizer?: { self?: boolean }
 }
 
 export async function fetchFutureEvents(since: Date): Promise<GcalEventRaw[]> {
@@ -141,6 +142,7 @@ export async function fetchFutureEvents(since: Date): Promise<GcalEventRaw[]> {
       singleEvents: 'true',
       orderBy: 'startTime',
       maxResults: '1000',
+      showHiddenInvitations: 'true',
       ...(pageToken ? { pageToken } : {}),
     })
     const data = await apiFetch(`/calendars/primary/events?${params}`) as { items?: GcalEventRaw[]; nextPageToken?: string }
@@ -186,8 +188,8 @@ function toBody(ev: { title: string; date: string; time?: string; endTime?: stri
       end:   { dateTime: `${ev.date}T${ev.endTime ?? ev.time}:00`, timeZone: tz },
     }
   }
-  const d = new Date(ev.date); d.setDate(d.getDate() + 1)
-  const nextDay = d.toISOString().slice(0, 10)
+  const d = new Date(ev.date + 'T00:00:00'); d.setDate(d.getDate() + 1)
+  const nextDay = [d.getFullYear(), String(d.getMonth() + 1).padStart(2, '0'), String(d.getDate()).padStart(2, '0')].join('-')
   return {
     summary: ev.title, description: ev.note ?? '', ...loc,
     start: { date: ev.date },
@@ -198,6 +200,8 @@ function toBody(ev: { title: string; date: string; time?: string; endTime?: stri
 export function fromGcalEvent(ev: GcalEventRaw) {
   const s = ev.start.dateTime ?? ev.start.date ?? ''
   const e = ev.end?.dateTime  ?? ev.end?.date  ?? ''
+  const selfAttendee = ev.attendees?.find(a => a.self)
+  const isInvitation = !!selfAttendee && selfAttendee.responseStatus === 'needsAction' && !ev.organizer?.self
   return {
     gcalId:  ev.id,
     title:   ev.summary ?? '(ללא שם)',
@@ -206,6 +210,7 @@ export function fromGcalEvent(ev: GcalEventRaw) {
     endTime: ev.end?.dateTime  ? e.slice(11, 16) : undefined,
     note:     ev.description ?? '',
     location: ev.location,
+    ...(isInvitation ? { rsvpStatus: 'pending' as const } : {}),
   }
 }
 

@@ -36,6 +36,7 @@ export interface CalendarEvent {
   links: string[]
   files: FileAttachment[]
   reminder?: number  // minutes before
+  parentId?: string   // ID of parent task (sub-task hierarchy)
   dependsOn?: string // event id
   dependsType?: 'FS' | 'SS' | 'FF' | 'SF'
   lag?: number       // hours between events
@@ -44,6 +45,9 @@ export interface CalendarEvent {
   location?: string
   recurrence?: RecurrenceRule
   recurrenceParentId?: string  // id of master recurring event
+  rsvpStatus?: 'pending' | 'accepted' | 'declined' | 'tentative'
+  sortIndex?: number
+  subCategories?: Category[]
 }
 
 export interface FileAttachment {

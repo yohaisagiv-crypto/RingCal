@@ -1,131 +1,210 @@
-import { useReducer, useEffect } from 'react'
+import { useReducer, useEffect, useRef } from 'react'
 import { useAppStore } from '../../store/useAppStore'
 import { useLang } from '../../hooks/useLang'
-import type { CalendarEvent, ViewMode } from '../../types'
+import { localISODate } from '../../hooks/useSpiralMath'
+import type { CalendarEvent } from '../../types'
 
 interface Props {
   onTap: (ev: CalendarEvent) => void
+  eventsOverride?: CalendarEvent[]
 }
 
-function periodBounds(mode: ViewMode, viewDate: Date): { from: string; to: string } {
-  const d = new Date(viewDate)
-  if (mode === 'day') {
-    const s = d.toISOString().slice(0, 10)
-    return { from: s, to: s }
-  }
-  if (mode === 'week') {
-    const day = d.getDay()
-    const sun = new Date(d); sun.setDate(d.getDate() - day)
-    const sat = new Date(sun); sat.setDate(sun.getDate() + 6)
-    return { from: sun.toISOString().slice(0, 10), to: sat.toISOString().slice(0, 10) }
-  }
-  if (mode === 'month') {
-    const from = new Date(d.getFullYear(), d.getMonth(), 1).toISOString().slice(0, 10)
-    const to   = new Date(d.getFullYear(), d.getMonth() + 1, 0).toISOString().slice(0, 10)
-    return { from, to }
-  }
-  // year
-  const from = `${d.getFullYear()}-01-01`
-  const to   = `${d.getFullYear()}-12-31`
-  return { from, to }
-}
-
-function dayLabel(
+function timeRemaining(
   ev: CalendarEvent,
+  mode: string,
   tr: ReturnType<typeof import('../../i18n/translations').getLang>
 ): { text: string; hot: boolean } {
   const nowMs = Date.now()
   const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0)
   const evDate = new Date(ev.date + 'T00:00:00')
-  const diffDays = Math.round((evDate.getTime() - todayStart.getTime()) / 86_400_000)
+  const diffMs = evDate.getTime() - todayStart.getTime()
+  const diffDays = Math.round(diffMs / 86_400_000)
 
-  if (diffDays === 0 && ev.time) {
-    const evMs = new Date(ev.date + `T${ev.time}:00`).getTime()
+  if (mode === 'day') {
+    // Show hours remaining
+    const evMs = ev.time
+      ? new Date(ev.date + `T${ev.time}:00`).getTime()
+      : evDate.getTime()
     const diffMin = Math.round((evMs - nowMs) / 60_000)
     if (diffMin <= 0) return { text: tr.today, hot: true }
     if (diffMin < 60) return { text: `${diffMin}′`, hot: true }
-    const hrs = Math.floor(diffMin / 60)
-    const mins = diffMin % 60
-    return { text: mins > 0 ? `${hrs}:${String(mins).padStart(2, '0')}` : `${hrs}h`, hot: true }
+    const hrs = diffMin / 60
+    const hFrac = hrs % 1
+    const hInt = Math.floor(hrs)
+    const fracStr = hFrac > 0.1 ? `.${Math.round(hFrac * 10)}` : ''
+    return { text: `${hInt}${fracStr}${tr.timeLeftHours}`, hot: hrs < 3 }
   }
-  if (diffDays === 0)  return { text: tr.today,    hot: true  }
-  if (diffDays === 1)  return { text: tr.tomorrow,  hot: false }
-  if (diffDays === -1) return { text: tr.agoDays + ' 1 ' + tr.unitDays, hot: false }
-  if (diffDays > 0 && diffDays < 60)  return { text: `${tr.inDays} ${diffDays} ${tr.unitDays}`, hot: false }
-  if (diffDays < 0 && diffDays > -60) return { text: `${tr.agoDays} ${-diffDays} ${tr.unitDays}`, hot: false }
-  const months = Math.round(Math.abs(diffDays) / 30)
-  return { text: diffDays > 0 ? `${tr.inDays} ${months} ${tr.unitMonths}` : `${tr.agoDays} ${months} ${tr.unitMonths}`, hot: false }
+
+  if (mode === 'week') {
+    if (diffDays <= 0) {
+      if (ev.time?.trim()) {
+        const evMs = new Date(ev.date + `T${ev.time}:00`).getTime()
+        const diffMin = Math.round((evMs - nowMs) / 60_000)
+        if (diffMin > 0) {
+          if (diffMin < 60) return { text: `${diffMin}′`, hot: true }
+          const hrs = diffMin / 60
+          return { text: `${Math.floor(hrs)}${tr.timeLeftHours}`, hot: hrs < 3 }
+        }
+      }
+      return { text: tr.today, hot: true }
+    }
+    if (diffDays === 1) return { text: tr.tomorrow, hot: true }
+    return { text: `${diffDays}${tr.timeLeftDays}`, hot: diffDays <= 2 }
+  }
+
+  if (mode === 'month') {
+    if (diffDays <= 0) {
+      if (ev.time?.trim()) {
+        const evMs = new Date(ev.date + `T${ev.time}:00`).getTime()
+        const diffMin = Math.round((evMs - nowMs) / 60_000)
+        if (diffMin > 0) {
+          if (diffMin < 60) return { text: `${diffMin}′`, hot: true }
+          const hrs = diffMin / 60
+          return { text: `${Math.floor(hrs)}${tr.timeLeftHours}`, hot: hrs < 3 }
+        }
+      }
+      return { text: tr.today, hot: true }
+    }
+    if (diffDays < 7) return { text: `${diffDays}${tr.timeLeftDays}`, hot: true }
+    const weeks = diffDays / 7
+    const wInt = Math.floor(weeks)
+    const wFrac = weeks % 1
+    const fracStr = wFrac > 0.1 ? `.${Math.round(wFrac * 10)}` : ''
+    return { text: `${wInt}${fracStr}${tr.timeLeftWeeks}`, hot: weeks < 1.5 }
+  }
+
+  // year mode — show months remaining
+  if (diffDays <= 0) {
+    if (ev.time?.trim()) {
+      const evMs = new Date(ev.date + `T${ev.time}:00`).getTime()
+      const diffMin = Math.round((evMs - nowMs) / 60_000)
+      if (diffMin > 0) {
+        if (diffMin < 60) return { text: `${diffMin}′`, hot: true }
+        const hrs = diffMin / 60
+        return { text: `${Math.floor(hrs)}${tr.timeLeftHours}`, hot: hrs < 3 }
+      }
+    }
+    return { text: tr.today, hot: true }
+  }
+  const months = diffDays / 30.5
+  if (months < 1) return { text: `${diffDays}${tr.timeLeftDays}`, hot: true }
+  const mInt = Math.floor(months)
+  const mFrac = months % 1
+  const fracStr = mFrac > 0.1 ? `.${Math.round(mFrac * 10)}` : ''
+  return { text: `${mInt}${fracStr}${tr.timeLeftMonths}`, hot: months < 1.5 }
 }
 
-export default function UpcomingStrip({ onTap }: Props) {
-  const { events, categories, mode, viewDate } = useAppStore()
+export default function UpcomingStrip({ onTap, eventsOverride }: Props) {
+  const { events: storeEvents, categories, mode, settings, needle } = useAppStore()
+  const events = eventsOverride ?? storeEvents
   const { tr, rtl } = useLang()
   const [, tick] = useReducer(x => x + 1, 0)
+  const stripRef = useRef<HTMLDivElement>(null)
+  const itemRefs = useRef<Map<string, HTMLButtonElement>>(new Map())
 
   useEffect(() => {
     const id = setInterval(tick, 60_000)
     return () => clearInterval(id)
   }, [])
 
-  const { from, to } = periodBounds(mode, viewDate)
   const catMap = Object.fromEntries(categories.map(c => [c.id, c]))
 
-  const today = new Date().toISOString().slice(0, 10)
+  const now = new Date()
+  const critEnd = new Date(now)
+  if (mode === 'day')        critEnd.setHours(critEnd.getHours() + (settings.criticalTime.day ?? 2))
+  else if (mode === 'week')  critEnd.setDate(critEnd.getDate() + (settings.criticalTime.week ?? 2))
+  else if (mode === 'month') critEnd.setDate(critEnd.getDate() + (settings.criticalTime.month ?? 7))
+  else                       critEnd.setMonth(critEnd.getMonth() + (settings.criticalTime.year ?? 2))
+
+  const nowStr     = localISODate(now)
+  const critEndStr = localISODate(critEnd)
+
   const periodEvents = events
-    .filter(e => !e.done && e.date >= from && e.date <= to)
+    .filter(e => !e.done && e.date >= nowStr && e.date <= critEndStr)
     .sort((a, b) => {
-      const aFuture = a.date >= today
-      const bFuture = b.date >= today
-      if (aFuture !== bFuture) return aFuture ? -1 : 1
       const da = a.date + (a.time ?? '00:00')
       const db = b.date + (b.time ?? '00:00')
-      return aFuture ? (da < db ? -1 : 1) : (da > db ? -1 : 1)
+      return da < db ? -1 : 1
     })
     .slice(0, 30)
 
-  const isPast = to < new Date().toISOString().slice(0, 10)
+  // Find the event closest to the needle
+  const needleMs = needle.getTime()
+  let activeId: string | null = null
+  let closestDiff = Infinity
+  for (const ev of periodEvents) {
+    const evMs = new Date(ev.date + 'T' + (ev.time ?? '00:00') + ':00').getTime()
+    const diff = Math.abs(evMs - needleMs)
+    if (diff < closestDiff) { closestDiff = diff; activeId = ev.id }
+  }
+
+  // Scroll active item into view when needle changes
+  useEffect(() => {
+    if (!activeId) return
+    const el = itemRefs.current.get(activeId)
+    if (el && stripRef.current) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' })
+    }
+  }, [activeId])
 
   return (
     <div
-      className="flex-shrink-0 flex gap-1.5 overflow-x-auto px-2.5 py-1.5 bg-white border-b border-gray-100"
+      ref={stripRef}
+      className="flex-shrink-0 flex gap-2 overflow-x-auto px-3 py-2 bg-white border-b-2 border-gray-200 shadow-sm"
       dir={rtl ? 'rtl' : 'ltr'}
       style={{ WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none', msOverflowStyle: 'none' }}
       onTouchStart={e => e.stopPropagation()}
       onTouchEnd={e => e.stopPropagation()}
     >
       {periodEvents.length === 0 && (
-        <span className="text-[10px] text-gray-300 font-medium px-1 py-0.5">
-          {rtl
-            ? (isPast ? 'אין אירועים בתקופה זו' : 'אין אירועים קרובים')
-            : (isPast ? 'No events in this period' : 'No upcoming events')}
+        <span className="text-xs text-gray-400 font-medium px-1 self-center">
+          {tr.noUpcomingInRange}
         </span>
       )}
       {periodEvents.map(ev => {
         const cat = catMap[ev.categoryId]
         const color = cat?.color ?? '#888'
-        const { text: dayText, hot } = dayLabel(ev, tr)
+        const { text: timeText, hot } = timeRemaining(ev, mode, tr)
+        const isTask = ev.itemType === 'task'
+        const isPending = ev.rsvpStatus === 'pending'
+        const typeLabel = isTask ? tr.typeTask : tr.typeEvent
+        const typeIcon = isPending ? '📬' : (isTask ? '✅' : '📅')
 
+        const isActive = ev.id === activeId
         return (
           <button
             key={ev.id}
+            ref={el => { if (el) itemRefs.current.set(ev.id, el); else itemRefs.current.delete(ev.id) }}
             onClick={() => onTap(ev)}
-            className="flex-shrink-0 flex items-center gap-1 rounded-lg px-2 py-1 active:opacity-70 transition-opacity"
-            style={{ backgroundColor: color + '14', border: `1px solid ${color}33` }}
+            className="flex-shrink-0 flex flex-col rounded-xl px-2.5 py-1.5 active:opacity-70 transition-all text-right"
+            style={{
+              backgroundColor: isActive ? color + '30' : (isPending ? '#3b82f610' : color + '18'),
+              border: `2px ${isTask ? 'dashed' : 'solid'} ${isActive ? color : (isPending ? '#3b82f6' : color + '55')}`,
+              minWidth: 90,
+              boxShadow: isActive ? `0 0 0 2px ${color}55` : undefined,
+              transform: isActive ? 'scale(1.07)' : undefined,
+            }}
           >
-            <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
-            <span className="text-[11px] font-bold max-w-[80px] truncate" style={{ color }}>
+            <div className="flex items-center gap-1 mb-0.5">
+              <span className="text-xs flex-shrink-0">{typeIcon}</span>
+              <span className="text-[10px] font-black px-1 py-0.5 rounded-md flex-shrink-0"
+                style={{ background: isPending ? '#3b82f620' : color + '30', color: isPending ? '#3b82f6' : color }}>
+                {isPending ? tr.rsvpPending : typeLabel}
+              </span>
+            </div>
+            <span className="text-xs font-bold max-w-[90px] truncate" style={{ color: isPending ? '#3b82f6' : color }}>
               {ev.title}
             </span>
-            {ev.time && (
-              <span className="text-[10px] font-mono font-semibold text-gray-400 flex-shrink-0">
-                {ev.time}
+            <div className="flex items-center gap-1 mt-0.5">
+              {ev.time && (
+                <span className="text-[10px] font-mono text-gray-400 flex-shrink-0">{ev.time.slice(0,5)}</span>
+              )}
+              <span className={`text-[10px] font-black rounded-lg px-1.5 py-0.5 flex-shrink-0 ${
+                hot ? 'bg-red-500 text-white' : 'bg-gray-100 text-gray-500'
+              }`}>
+                {timeText}
               </span>
-            )}
-            <span className={`text-[9px] font-black rounded px-1 py-0.5 flex-shrink-0 ${
-              hot ? 'bg-red-500 text-white' : isPast ? 'bg-gray-100 text-gray-300' : 'bg-gray-100 text-gray-400'
-            }`}>
-              {dayText}
-            </span>
+            </div>
           </button>
         )
       })}

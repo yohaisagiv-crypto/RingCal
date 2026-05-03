@@ -1,4 +1,4 @@
-package com.spiraldiary.app;
+package com.ringcal.app;
 
 import com.getcapacitor.BridgeActivity;
 

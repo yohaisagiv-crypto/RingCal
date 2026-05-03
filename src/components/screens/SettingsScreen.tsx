@@ -1,16 +1,12 @@
 import { useState } from 'react'
 import { useAppStore } from '../../store/useAppStore'
 import { useLang } from '../../hooks/useLang'
-import type { Category } from '../../types'
+import { localISODate } from '../../hooks/useSpiralMath'
+import type { Category, CalendarEvent } from '../../types'
 import * as gcal from '../../services/googleCalendar'
-
-const LANGS = [
-  { code: 'he', label: 'עברית' }, { code: 'en', label: 'English' },
-  { code: 'fr', label: 'Français' }, { code: 'es', label: 'Español' },
-  { code: 'de', label: 'Deutsch' }, { code: 'ru', label: 'Русский' },
-  { code: 'ar', label: 'العربية' }, { code: 'zh', label: '中文' },
-  { code: 'pt', label: 'Português' },
-]
+import { LANGS } from '../../constants/langs'
+import EventSheet from '../EventSheet'
+import SearchOverlay from '../SearchOverlay'
 
 const PRESET_COLORS = [
   '#4285f4','#ea4335','#fbbc04','#34a853',
@@ -28,12 +24,17 @@ const PRESET_ICONS = [
 export default function SettingsScreen({ onBack }: { onBack: () => void }) {
   const { settings, updateSettings, updateCriticalTime, categories, updateCategory,
           addCategory, deleteCategory, reorderCategory,
-          events, gcalConnected, setGcalConnected, addEvent, patchEventGcalId } = useAppStore()
-  const { tr } = useLang()
+          events, gcalConnected, setGcalConnected, addEvent, patchEventGcalId,
+          importData } = useAppStore()
+  const { tr, rtl } = useLang()
   const [gcalStatus, setGcalStatus] = useState<'idle' | 'syncing' | 'error'>('idle')
   const [gcalError, setGcalError] = useState('')
   const [editCat, setEditCat] = useState<Category | null>(null)
   const [isNewCat, setIsNewCat] = useState(false)
+  const [showSearch, setShowSearch] = useState(false)
+  const [searchResult, setSearchResult] = useState<CalendarEvent | null>(null)
+  const [importDone, setImportDone] = useState(false)
+  const [importError, setImportError] = useState(false)
 
   const openNew = () => {
     const maxRing = categories.length > 0 ? Math.max(...categories.map(c => c.ring)) + 1 : 0
@@ -60,23 +61,29 @@ export default function SettingsScreen({ onBack }: { onBack: () => void }) {
   }
 
   const pullFromGcal = async () => {
-    if (!gcalConnected || !gcal.isConnected()) return
+    if (!gcalConnected) return
+    if (!gcal.isConnected()) {
+      setGcalStatus('error')
+      setGcalError(tr.gcalExpiredToken)
+      return
+    }
     setGcalStatus('syncing')
+    setGcalError('')
     try {
-      const since = new Date(new Date().getFullYear() - 3, 0, 1)
+      const since = new Date(Date.now() - 30 * 86_400_000) // 30 days back
       const gcalEvents = await gcal.fetchFutureEvents(since)
       const existingIds = new Set(events.map(e => e.gcalId).filter(Boolean))
       for (const ge of gcalEvents) {
         if (existingIds.has(ge.id)) continue
         const imported = gcal.fromGcalEvent(ge)
-        addEvent({ ...imported, categoryId: categories[0]?.id ?? '', priority: 'N', done: false, links: [], files: [] })
-        const newEv = useAppStore.getState().events.find(e => e.title === imported.title && e.date === imported.date && !e.gcalId)
-        if (newEv) patchEventGcalId(newEv.id, ge.id)
+        const newId = addEvent({ ...imported, itemType: 'event', categoryId: categories[0]?.id ?? '', priority: 'N', done: false, links: [], files: [] })
+        patchEventGcalId(newId, ge.id)
       }
       setGcalStatus('idle')
     } catch (e) {
       setGcalStatus('error')
-      setGcalError(e instanceof Error ? e.message : 'שגיאה')
+      const msg = e instanceof Error ? e.message : tr.gcalGenericError
+      setGcalError(msg.includes('401') ? tr.gcalExpiredToken : msg)
     }
   }
 
@@ -86,19 +93,19 @@ export default function SettingsScreen({ onBack }: { onBack: () => void }) {
     try {
       await gcal.authorize()
       const now = new Date()
-      const localFuture = events.filter(e => new Date(e.date) >= now)
+      const localFuture = events.filter(e => new Date(e.date + 'T00:00:00') >= now)
       const blocked = new Set(categories.filter(c => !c.syncToGcal).map(c => c.id))
       await gcal.initialSync(
         localFuture,
         blocked,
-        (imported) => addEvent({ ...imported, categoryId: categories[0]?.id ?? '', priority: 'N', done: false, links: [], files: [] }),
+        (imported) => addEvent({ ...imported, itemType: 'event', categoryId: categories[0]?.id ?? '', priority: 'N', done: false, links: [], files: [] }),
         (localId, gcalId) => patchEventGcalId(localId, gcalId),
       )
       setGcalConnected(true)
       setGcalStatus('idle')
     } catch (e) {
       setGcalStatus('error')
-      setGcalError(e instanceof Error ? e.message : 'שגיאה לא ידועה')
+      setGcalError(e instanceof Error ? e.message : tr.gcalUnknownError)
     }
   }
 
@@ -113,6 +120,71 @@ export default function SettingsScreen({ onBack }: { onBack: () => void }) {
     updateCriticalTime({ [key]: Math.max(0, Math.round((cur + d) * 2) / 2) })
   }
 
+  const exportCsv = () => {
+    const BOM = '﻿'
+    const headers = ['type','title','date','time','endDate','endTime','category','priority','done','note','location']
+    const rows = useAppStore.getState().events.map(e => {
+      const cat = categories.find(c => c.id === e.categoryId)
+      return [
+        e.itemType ?? 'event',
+        e.title,
+        e.date,
+        e.time ?? '',
+        e.endDate ?? '',
+        e.endTime ?? '',
+        cat?.name ?? '',
+        e.priority ?? '',
+        e.done ? '1' : '0',
+        (e.note ?? '').replace(/\n/g, ' '),
+        e.location ?? '',
+      ].map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')
+    })
+    const csv = BOM + [headers.join(','), ...rows].join('\r\n')
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `ringcal-${localISODate()}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  const exportJson = () => {
+    const state = useAppStore.getState()
+    const data = {
+      exportDate: new Date().toISOString(),
+      events: state.events,
+      categories: state.categories,
+      settings: state.settings,
+    }
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `ringcal-backup-${localISODate()}.json`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  const handleImportJson = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    e.target.value = ''
+    const reader = new FileReader()
+    reader.onload = (ev) => {
+      try {
+        const data = JSON.parse(ev.target?.result as string)
+        importData(data)
+        setImportDone(true)
+        setImportError(false)
+      } catch {
+        setImportError(true)
+        setImportDone(false)
+      }
+    }
+    reader.readAsText(file)
+  }
+
   const sortedCats = [...categories].sort((a, b) => a.ring - b.ring)
 
   return (
@@ -120,9 +192,12 @@ export default function SettingsScreen({ onBack }: { onBack: () => void }) {
       {/* Header */}
       <div className="flex-shrink-0 bg-white border-b border-gray-200 px-4 py-2 flex items-center gap-2">
         <button onClick={onBack} className="bg-blue-500 text-white text-sm font-bold px-3 py-1.5 rounded-full flex-shrink-0">
-          {tr.backToBoard}
+          ← {tr.backToBoard}
         </button>
         <span className="font-mono text-lg font-black text-gray-800 flex-1 text-center">⚙️ {tr.settings}</span>
+        <button onClick={() => setShowSearch(true)} className="w-8 h-8 rounded-lg bg-blue-500 text-white flex items-center justify-center text-lg flex-shrink-0">
+          🔍
+        </button>
       </div>
 
       <div className="flex-1 overflow-y-auto px-4 py-5 flex flex-col gap-6">
@@ -134,7 +209,7 @@ export default function SettingsScreen({ onBack }: { onBack: () => void }) {
               <button key={l.code} onClick={() => updateSettings({ language: l.code })}
                 className={`px-4 py-2 rounded-full text-sm font-bold border-2 transition-all ${
                   settings.language === l.code ? 'bg-blue-500 text-white border-blue-500' : 'bg-gray-50 text-gray-600 border-gray-200'
-                }`}>{l.label}</button>
+                }`}>{l.name}</button>
             ))}
           </div>
         </S>
@@ -145,7 +220,8 @@ export default function SettingsScreen({ onBack }: { onBack: () => void }) {
             <>
               <Row icon="✅" title={tr.gcalConnected} sub={tr.gcalConnectedSub}
                 action={tr.gcalDisconnect} onPress={disconnectGcal} />
-              <Row icon="🔄" title={tr.gcalSync} sub={gcalStatus === 'syncing' ? tr.gcalSyncing : tr.gcalSyncSub ?? 'משוך אירועים חדשים מגוגל'}
+              <Row icon="🔄" title={tr.gcalSync}
+                sub={gcalStatus === 'syncing' ? tr.gcalSyncing : gcalStatus === 'error' ? `⚠️ ${gcalError}` : tr.gcalSyncSub}
                 action={gcalStatus === 'syncing' ? '...' : '↻'} onPress={pullFromGcal} last />
             </>
           ) : (
@@ -268,6 +344,27 @@ export default function SettingsScreen({ onBack }: { onBack: () => void }) {
           <Row icon="🖨️" title={tr.print} action={tr.printBtn} onPress={() => window.print()} last />
         </S>
 
+        {/* Export & Backup */}
+        <S label={tr.exportSection}>
+          <Row icon="📊" title={tr.exportCsvBtn} sub={tr.exportCsvSub} action="↓" onPress={exportCsv} />
+          <Row icon="💾" title={tr.exportJsonBtn} sub={tr.exportJsonSub} action="↓" onPress={exportJson} />
+          <Row
+            icon="📂"
+            title={tr.importJsonBtn}
+            sub={importDone ? tr.importDoneMsg : importError ? tr.importErrorMsg : tr.importJsonSub}
+            action="↑"
+            onPress={() => document.getElementById('json-import-input')?.click()}
+            last
+          />
+          <input
+            id="json-import-input"
+            type="file"
+            accept=".json"
+            className="hidden"
+            onChange={handleImportJson}
+          />
+        </S>
+
       </div>
 
       {/* Category editor sheet */}
@@ -280,15 +377,27 @@ export default function SettingsScreen({ onBack }: { onBack: () => void }) {
           onDelete={() => { deleteCategory(editCat.id); closeEditor() }}
           onClose={closeEditor}
           tr={tr as unknown as Record<string, string>}
+          rtl={rtl}
           canDelete={!isNewCat && categories.length > 1}
         />
+      )}
+
+      {showSearch && (
+        <SearchOverlay
+          events={events}
+          onClose={() => setShowSearch(false)}
+          onSelect={ev => { setShowSearch(false); setSearchResult(ev) }}
+        />
+      )}
+      {searchResult && (
+        <EventSheet event={searchResult} defaultDate={null} forceItemType={searchResult.itemType === 'task' ? 'task' : 'event'} onClose={() => setSearchResult(null)} />
       )}
     </div>
   )
 }
 
 function CategoryEditor({
-  cat, isNew, onChange, onSave, onDelete, onClose, tr, canDelete
+  cat, isNew, onChange, onSave, onDelete, onClose, tr, rtl, canDelete
 }: {
   cat: Category
   isNew: boolean
@@ -297,6 +406,7 @@ function CategoryEditor({
   onDelete: () => void
   onClose: () => void
   tr: Record<string, string>
+  rtl: boolean
   canDelete: boolean
 }) {
   const nameError = cat.name.trim() === ''
@@ -312,7 +422,7 @@ function CategoryEditor({
           <button onClick={onClose}
             className="w-9 h-9 rounded-full bg-red-500 text-white font-black flex items-center justify-center shadow-md">×</button>
           <span className="font-mono text-sm font-bold text-blue-500 flex-1 text-center">
-            {isNew ? tr.addCat : tr.editCat ?? 'ערוך קטגוריה'}
+            {isNew ? tr.addCat : tr.editCat}
           </span>
           {canDelete && (
             <button onClick={onDelete} className="border border-red-400 text-red-500 text-xs rounded-lg px-3 py-1">
@@ -329,18 +439,18 @@ function CategoryEditor({
         </div>
 
         {/* Name */}
-        <p className="text-[10px] text-gray-400 font-mono uppercase mb-1">{tr.catName ?? 'שם קטגוריה'}</p>
+        <p className="text-[10px] text-gray-400 font-mono uppercase mb-1">{tr.catName}</p>
         <input
           value={cat.name}
           onChange={e => onChange({ ...cat, name: e.target.value })}
-          placeholder={tr.catNamePh ?? 'שם...'}
+          placeholder={tr.catNamePh}
           className={`w-full bg-gray-50 border-2 rounded-xl px-3 py-2.5 text-base font-bold text-gray-800 outline-none mb-4 ${nameError ? 'border-red-400' : 'border-blue-300'}`}
-          dir="rtl"
+          dir={rtl ? 'rtl' : 'ltr'}
           autoFocus
         />
 
         {/* Icon picker */}
-        <p className="text-[10px] text-gray-400 font-mono uppercase mb-2">{tr.catIcon ?? 'אייקון'}</p>
+        <p className="text-[10px] text-gray-400 font-mono uppercase mb-2">{tr.catIcon}</p>
         <div className="grid grid-cols-8 gap-1.5 mb-4">
           {PRESET_ICONS.map(ic => (
             <button key={ic} onClick={() => onChange({ ...cat, icon: ic })}
@@ -353,7 +463,7 @@ function CategoryEditor({
         </div>
 
         {/* Color picker */}
-        <p className="text-[10px] text-gray-400 font-mono uppercase mb-2">{tr.catColor ?? 'צבע'}</p>
+        <p className="text-[10px] text-gray-400 font-mono uppercase mb-2">{tr.catColor}</p>
         <div className="grid grid-cols-8 gap-1.5 mb-5">
           {PRESET_COLORS.map(col => (
             <button key={col} onClick={() => onChange({ ...cat, color: col })}
@@ -397,7 +507,7 @@ function Row({ icon, title, sub, action, onPress, last }: {
       <span className="text-xl w-6 text-center flex-shrink-0">{icon}</span>
       <div className="flex-1 min-w-0">
         <p className="text-sm text-gray-800">{title}</p>
-        {sub && <p className="text-sm font-semibold text-gray-600 mt-0.5">{sub}</p>}
+        {sub && <p className="text-xs text-gray-500 mt-0.5">{sub}</p>}
       </div>
       {action && (
         typeof action === 'string'

@@ -3,11 +3,10 @@ import { useLang } from '../../hooks/useLang'
 import { useEffect, useReducer, useCallback, useRef } from 'react'
 
 interface Props {
-  onMenu: () => void
   onSearch: () => void
 }
 
-export default function NeedleBar({ onMenu, onSearch }: Props) {
+export default function NeedleBar({ onSearch }: Props) {
   const { needle, setNeedle, setViewDate, events, mode } = useAppStore()
   const { tr } = useLang()
   const [, forceUpdate] = useReducer(x => x + 1, 0)
@@ -21,23 +20,25 @@ export default function NeedleBar({ onMenu, onSearch }: Props) {
   const now = new Date()
   const isNow = Math.abs(needle.getTime() - now.getTime()) < 120000
 
-  const label1 = `${tr.days[needle.getDay()]} — ${needle.getDate()} ${tr.monthsShort[needle.getMonth()]}`
-  const label2 = `${needle.getDate()}/${needle.getMonth()+1} ${needle.getHours().toString().padStart(2,'0')}:${needle.getMinutes().toString().padStart(2,'0')}`
+  const dateLabel = `${tr.days[needle.getDay()]} ${needle.getDate()} ${tr.monthsShort[needle.getMonth()]}`
+  const timeLabel = `${needle.getHours().toString().padStart(2,'0')}:${needle.getMinutes().toString().padStart(2,'0')}`
 
   const moveNeedle = useCallback((dir: number) => {
-    const sorted = [...events].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+    const evMs = (e: { date: string; time?: string }) =>
+      new Date(e.date + 'T' + (e.time ?? '00:00') + ':00').getTime()
+    const sorted = [...events].filter(e => !e.done).sort((a, b) => evMs(a) - evMs(b))
     const cur = needle.getTime()
     const go = (d: Date) => { setNeedle(d); setViewDate(d) }
     if (dir > 0) {
-      const next = sorted.find(e => new Date(e.date).getTime() > cur)
-      if (next) { go(new Date(next.date)); return }
+      const next = sorted.find(e => evMs(e) > cur)
+      if (next) { go(new Date(next.date + 'T' + (next.time ?? '00:00') + ':00')); return }
       const d = new Date(needle)
       if (mode === 'day') d.setHours(d.getHours() + 1)
       else d.setDate(d.getDate() + 1)
       go(d)
     } else {
-      const prev = [...sorted].reverse().find(e => new Date(e.date).getTime() < cur)
-      if (prev) { go(new Date(prev.date)); return }
+      const prev = [...sorted].reverse().find(e => evMs(e) < cur)
+      if (prev) { go(new Date(prev.date + 'T' + (prev.time ?? '00:00') + ':00')); return }
       const d = new Date(needle)
       if (mode === 'day') d.setHours(d.getHours() - 1)
       else d.setDate(d.getDate() - 1)
@@ -46,53 +47,58 @@ export default function NeedleBar({ onMenu, onSearch }: Props) {
   }, [needle, events, setNeedle, setViewDate, mode])
 
   return (
-    <div className="flex-shrink-0 flex items-center gap-1 px-2 py-1 bg-white border-b-[3px] border-red-400">
-      {/* menu */}
-      <button onClick={onMenu} className="w-7 h-7 bg-gray-100 rounded-md text-gray-500 text-base flex items-center justify-center flex-shrink-0">
-        ☰
+    <div className="flex-shrink-0 flex items-center px-2 py-1.5 bg-white border-b-2 border-red-400" style={{ gap: 0 }}>
+      {/* Prev event */}
+      <button
+        onClick={() => moveNeedle(-1)}
+        className="flex items-center gap-0.5 h-9 px-2.5 rounded-full bg-red-500 text-white flex-shrink-0 text-sm font-bold shadow"
+      >
+        <span className="text-base leading-none">←</span>
+        <span className="text-[10px] font-black leading-none hidden xs:block">{tr.prevShort}</span>
       </button>
 
-      <div className="flex-[0.3]" />
-
-      {/* prev */}
-      <button onClick={() => moveNeedle(-1)} className="w-7 h-7 rounded-full bg-gradient-to-br from-red-400 to-red-600 text-white flex items-center justify-center shadow flex-shrink-0 text-sm">
-        ↺
+      {/* Center info + pick time */}
+      <button
+        className="flex-1 flex flex-col items-center justify-center min-w-0 mx-1 relative py-1"
+        onClick={() => { try { timeInputRef.current?.showPicker?.() } catch { timeInputRef.current?.click() } }}
+      >
+        <span className={`text-sm font-black truncate max-w-full ${isNow ? 'text-red-500' : 'text-gray-800'}`}>
+          {isNow ? `🔴 ${tr.now}` : dateLabel}
+        </span>
+        <span className="text-xs font-mono text-gray-400">{timeLabel} · {tr.pickTime}</span>
+        <input
+          ref={timeInputRef}
+          type="datetime-local"
+          className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
+          value={`${needle.getFullYear()}-${String(needle.getMonth()+1).padStart(2,'0')}-${String(needle.getDate()).padStart(2,'0')}T${String(needle.getHours()).padStart(2,'0')}:${String(needle.getMinutes()).padStart(2,'0')}`}
+          onChange={e => { if (e.target.value) { const d = new Date(e.target.value); setNeedle(d); setViewDate(d) } }}
+        />
       </button>
 
-      {/* center info */}
-      <div className="flex-1 flex flex-col items-center min-w-0">
-        <span className="text-[11px] font-black text-gray-800 whitespace-nowrap overflow-hidden text-ellipsis max-w-full">
-          {label1}
-        </span>
-        <span className={`text-[9px] font-semibold font-mono ${isNow ? 'text-orange-400' : 'text-gray-400'}`}>
-          {isNow ? tr.now : label2}
-        </span>
+      {/* Next event */}
+      <button
+        onClick={() => moveNeedle(1)}
+        className="flex items-center gap-0.5 h-9 px-2.5 rounded-full bg-red-500 text-white flex-shrink-0 text-sm font-bold shadow"
+      >
+        <span className="text-[10px] font-black leading-none hidden xs:block">{tr.nextShort}</span>
+        <span className="text-base leading-none">→</span>
+      </button>
+
+      <div className="w-6 flex-shrink-0" />
+
+      {/* Today reset */}
+      {!isNow && (
         <button
-          onClick={() => { try { timeInputRef.current?.showPicker?.() } catch { timeInputRef.current?.click() } }}
-          className="bg-blue-500 text-white text-[9px] font-bold px-2 py-0.5 rounded mt-0.5 relative"
-        >
-          {tr.pickTime}
-          <input
-            ref={timeInputRef}
-            type="datetime-local"
-            className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
-            value={`${needle.getFullYear()}-${String(needle.getMonth()+1).padStart(2,'0')}-${String(needle.getDate()).padStart(2,'0')}T${String(needle.getHours()).padStart(2,'0')}:${String(needle.getMinutes()).padStart(2,'0')}`}
-            onChange={e => { if (e.target.value) { const d = new Date(e.target.value); setNeedle(d); setViewDate(d) } }}
-          />
-        </button>
-      </div>
+          onClick={() => { const n = new Date(); setNeedle(n); setViewDate(n) }}
+          className="w-9 h-9 rounded-lg bg-red-50 border border-red-300 text-red-500 flex items-center justify-center flex-shrink-0 text-[10px] font-black leading-tight"
+        >{tr.today}</button>
+      )}
 
-      {/* next */}
-      <button onClick={() => moveNeedle(1)} className="w-7 h-7 rounded-full bg-gradient-to-br from-red-400 to-red-600 text-white flex items-center justify-center shadow flex-shrink-0 text-sm">
-        ↻
-      </button>
-
-      <div className="flex-[0.3]" />
-
-      {/* search */}
-      <button onClick={onSearch} className="w-8 h-8 bg-blue-500 rounded-lg text-white text-base flex items-center justify-center shadow flex-shrink-0">
-        🔍
-      </button>
+      {/* Search — separated from red buttons */}
+      <button
+        onClick={onSearch}
+        className="w-9 h-9 rounded-lg bg-blue-500 text-white flex items-center justify-center flex-shrink-0 text-lg"
+      >🔍</button>
     </div>
   )
 }

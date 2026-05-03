@@ -1,0 +1,10 @@
+[{
+  "relation": ["delegate_permission/common.handle_all_urls"],
+  "target": {
+    "namespace": "android_app",
+    "package_name": "com.ringcal.app",
+    "sha256_cert_fingerprints": [
+      "5D:2D:8D:3B:66:0A:C6:EF:32:7F:8D:71:8C:31:1C:74:64:6B:59:99:C2:22:CB:9A:B7:AD:93:A9:6F:82:E8:F4"
+    ]
+  }
+}]

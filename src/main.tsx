@@ -32,7 +32,7 @@ if (window.location.pathname === '/oauth' && window.location.hash.includes('acce
   if (isAndroid) {
     setTimeout(() => { try { window.location.href = intentUrl } catch(_) {} }, 400)
   } else {
-    window.opener?.postMessage(window.location.href, '*')
+    window.opener?.postMessage(window.location.href, window.location.origin)
     window.close()
   }
 

@@ -5,18 +5,6 @@ interface Props extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'onCha
   onChange: (val: string) => void
 }
 
-function makeListener(el: HTMLInputElement | HTMLTextAreaElement, onChangeRef: React.MutableRefObject<(v: string) => void>) {
-  return (e: Event) => {
-    const ie = e as InputEvent
-    if (ie.inputType === 'deleteContentBackward' || ie.inputType === 'deleteContentForward') {
-      // queueMicrotask gives the DOM time to finish the deletion before we read the value
-      queueMicrotask(() => onChangeRef.current(el.value))
-    } else {
-      onChangeRef.current(el.value)
-    }
-  }
-}
-
 export function NativeInput({ value, onChange, ...props }: Props) {
   const ref = useRef<HTMLInputElement>(null)
   const onChangeRef = useRef(onChange)
@@ -25,17 +13,48 @@ export function NativeInput({ value, onChange, ...props }: Props) {
   useEffect(() => {
     const el = ref.current
     if (!el) return
-    const handler = makeListener(el, onChangeRef)
-    el.addEventListener('input', handler)
-    return () => el.removeEventListener('input', handler)
+
+    let last = el.value
+
+    const read = () => {
+      const v = el.value
+      if (v !== last) { last = v; onChangeRef.current(v) }
+    }
+
+    // Standard input event
+    el.addEventListener('input', read)
+
+    // selectionchange fires when cursor moves (after IME backspace) — more reliable on Android
+    const onSelChange = () => { if (document.activeElement === el) read() }
+    document.addEventListener('selectionchange', onSelChange)
+
+    // keyup catches hardware backspace key events
+    el.addEventListener('keyup', read)
+
+    // Fallback poll at 30ms — catches anything missed by events
+    const poll = setInterval(() => {
+      if (document.activeElement === el) read()
+    }, 30)
+
+    return () => {
+      el.removeEventListener('input', read)
+      el.removeEventListener('keyup', read)
+      document.removeEventListener('selectionchange', onSelChange)
+      clearInterval(poll)
+    }
   }, [])
 
   useEffect(() => {
     const el = ref.current
-    if (el && document.activeElement !== el) el.value = value
+    if (!el || document.activeElement === el) return
+    if (el.value !== value) {
+      const s = el.selectionStart; const e2 = el.selectionEnd
+      el.value = value
+      try { el.setSelectionRange(s, e2) } catch { /* type may not support selection */ }
+    }
   })
 
-  return <input ref={ref} defaultValue={value} {...props} />
+  return <input ref={ref} defaultValue={value} autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false} {...props} />
 }
 
 interface TAProps extends Omit<React.TextareaHTMLAttributes<HTMLTextAreaElement>, 'onChange' | 'value'> {
@@ -51,9 +70,22 @@ export function NativeTextarea({ value, onChange, ...props }: TAProps) {
   useEffect(() => {
     const el = ref.current
     if (!el) return
-    const handler = makeListener(el, onChangeRef)
-    el.addEventListener('input', handler)
-    return () => el.removeEventListener('input', handler)
+    let last = el.value
+    const read = () => {
+      const v = el.value
+      if (v !== last) { last = v; onChangeRef.current(v) }
+    }
+    el.addEventListener('input', read)
+    el.addEventListener('keyup', read)
+    const onSelChange = () => { if (document.activeElement === el) read() }
+    document.addEventListener('selectionchange', onSelChange)
+    const poll = setInterval(() => { if (document.activeElement === el) read() }, 30)
+    return () => {
+      el.removeEventListener('input', read)
+      el.removeEventListener('keyup', read)
+      document.removeEventListener('selectionchange', onSelChange)
+      clearInterval(poll)
+    }
   }, [])
 
   useEffect(() => {

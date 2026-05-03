@@ -17,7 +17,7 @@ function OAuthRedirect() {
   useEffect(() => {
     if (isAndroid) setTimeout(() => { window.location.href = intentUrl }, 400)
     else {
-      window.opener?.postMessage(window.location.href, '*')
+      window.opener?.postMessage(window.location.href, window.location.origin)
       window.close()
     }
   }, [])

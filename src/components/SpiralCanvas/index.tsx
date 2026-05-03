@@ -7,19 +7,21 @@ import type { CalendarEvent, Category } from '../../types'
 interface Props {
   onTapEmpty: (date: Date) => void
   onTapEvent: (ev: CalendarEvent) => void
+  eventsOverride?: CalendarEvent[]
 }
 
-export default function SpiralCanvas({ onTapEmpty, onTapEvent }: Props) {
+export default function SpiralCanvas({ onTapEmpty, onTapEvent, eventsOverride }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
-  const { mode, needle, viewDate, events, categories, settings, setNeedle, spiralGeneration } = useAppStore()
+  const { mode, needle, viewDate, events: storeEvents, categories, settings, setNeedle, spiralGeneration } = useAppStore()
+  const events = eventsOverride ?? storeEvents
   const { tr } = useLang()
-  const now = new Date()
   const year = viewDate.getFullYear()
   const month = viewDate.getMonth()
 
   // Drag state
   const isDragging = useRef(false)
   const dragStart = useRef<{ x: number; y: number } | null>(null)
+  const isDraggingNeedle = useRef(false)
 
   // Pinch-to-zoom + pan state
   const zoom = useRef(1)
@@ -37,6 +39,7 @@ export default function SpiralCanvas({ onTapEmpty, onTapEvent }: Props) {
   }, [mode, spiralGeneration])
 
   const draw = useCallback(() => {
+    const now = new Date()
     const canvas = canvasRef.current
     if (!canvas) return
     const ctx = canvas.getContext('2d')
@@ -189,7 +192,7 @@ export default function SpiralCanvas({ onTapEmpty, onTapEvent }: Props) {
     if (!canvas) return
     const wrap = canvas.parentElement!
     const resize = () => {
-      const size = Math.min(wrap.offsetWidth, wrap.offsetHeight) - 16
+      const size = Math.min(wrap.offsetWidth, wrap.offsetHeight) - 8
       canvas.width = size
       canvas.height = size
       canvas.style.width = size + 'px'
@@ -243,6 +246,25 @@ export default function SpiralCanvas({ onTapEmpty, onTapEvent }: Props) {
     if (activePointers.current.size === 1) {
       dragStart.current = { x: e.clientX, y: e.clientY }
       isDragging.current = false
+      // Detect if touch is near the needle (to allow needle drag even when zoomed)
+      isDraggingNeedle.current = false
+      if (zoom.current > 1) {
+        const frac = getAngleFromPointer(e.clientX, e.clientY)
+        if (frac !== null) {
+          const dim = daysInMonth(year, month)
+          const nMin = needle.getHours() * 60 + needle.getMinutes()
+          let needleFrac = 0
+          if (mode === 'day') needleFrac = nMin / 1440
+          else if (mode === 'week') needleFrac = (needle.getDay() + nMin / 1440) / 7
+          else if (mode === 'month') needleFrac = (needle.getDate() - 1 + nMin / 1440) / dim
+          else {
+            const jan1 = new Date(needle.getFullYear(), 0, 1).getTime()
+            needleFrac = (needle.getTime() - jan1) / (new Date(needle.getFullYear() + 1, 0, 1).getTime() - jan1)
+          }
+          const diff = Math.min(Math.abs(frac - needleFrac), 1 - Math.abs(frac - needleFrac))
+          if (diff < 0.05) isDraggingNeedle.current = true
+        }
+      }
     } else if (activePointers.current.size === 2) {
       // Start pinch
       const pts = Array.from(activePointers.current.values())
@@ -256,7 +278,7 @@ export default function SpiralCanvas({ onTapEmpty, onTapEvent }: Props) {
       dragStart.current = null
     }
     ;(e.currentTarget as HTMLCanvasElement).setPointerCapture(e.pointerId)
-  }, [])
+  }, [year, month, needle, mode, getAngleFromPointer])
 
   const onPointerMove = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
     activePointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
@@ -292,9 +314,24 @@ export default function SpiralCanvas({ onTapEmpty, onTapEvent }: Props) {
       isDragging.current = true
     }
     if (isDragging.current) {
-      // Single finger always rotates needle (pan is two-finger only)
-      const frac = getAngleFromPointer(e.clientX, e.clientY)
-      if (frac !== null) setNeedle(fracToDate(frac, mode, viewDate))
+      if (zoom.current > 1 && !isDraggingNeedle.current) {
+        // When zoomed in and not on needle: single finger pans
+        const canvas = canvasRef.current
+        if (canvas && dragStart.current) {
+          const scale = canvas.width / canvas.getBoundingClientRect().width
+          const maxPan = (canvas.width / 2) * (zoom.current - 1)
+          panOffset.current = {
+            x: Math.max(-maxPan, Math.min(maxPan, panOffset.current.x + (e.clientX - dragStart.current.x) * scale)),
+            y: Math.max(-maxPan, Math.min(maxPan, panOffset.current.y + (e.clientY - dragStart.current.y) * scale)),
+          }
+          dragStart.current = { x: e.clientX, y: e.clientY }
+          draw()
+        }
+      } else {
+        // Not zoomed or dragging needle: single finger rotates needle
+        const frac = getAngleFromPointer(e.clientX, e.clientY)
+        if (frac !== null) setNeedle(fracToDate(frac, mode, viewDate))
+      }
     }
   }, [mode, viewDate, getAngleFromPointer, canvasToWorld, setNeedle, draw])
 
@@ -328,7 +365,7 @@ export default function SpiralCanvas({ onTapEmpty, onTapEvent }: Props) {
         const isOnNeedle = needleDiff < 0.03
 
         // Tap directly on event dot → open event
-        const tappedEv = hitTestEvent(x, y, mode, events, categories, CX, CY, S, CX * 2, year, month)
+        const tappedEv = hitTestEvent(x, y, mode, events, categories, CX, CY, S, CX * 2, year, month, viewDate)
         if (tappedEv) {
           onTapEvent(tappedEv)
         } else if (isOnNeedle) {
@@ -352,7 +389,7 @@ export default function SpiralCanvas({ onTapEmpty, onTapEvent }: Props) {
       className="flex-1 overflow-hidden bg-[#f5f5f7]"
       style={{ position: 'relative' }}
       onTouchStart={(e) => { if (zoom.current > 1 || e.touches.length >= 2) e.stopPropagation() }}
-      onTouchEnd={(e)   => { if (zoom.current > 1 || e.touches.length >= 1 || activePointers.current.size >= 2) e.stopPropagation() }}
+      onTouchEnd={(e)   => { if (zoom.current > 1 || e.touches.length > 0 || e.changedTouches.length > 1) e.stopPropagation() }}
     >
       <canvas
         ref={canvasRef}
@@ -376,7 +413,7 @@ export default function SpiralCanvas({ onTapEmpty, onTapEvent }: Props) {
 
 function drawSpokes(
   ctx: CanvasRenderingContext2D,
-  mode: string, T: number,
+  mode: string, _T: number,
   CX: number, CY: number,
   R_IN: number, R_OUT: number, R_CAT_OUT: number,
   S: number, year: number, month: number
@@ -444,7 +481,7 @@ function drawSpokes(
 }
 
 function drawWeekendShading(
-  ctx: CanvasRenderingContext2D, mode: string, T: number,
+  ctx: CanvasRenderingContext2D, mode: string, _T: number,
   CX: number, CY: number, R_IN: number, R_OUT: number, year: number, month: number
 ) {
   const shade = (a1: number, a2: number, isSat: boolean) => {
@@ -484,7 +521,7 @@ function drawWeekendShading(
 }
 
 function drawDateLabels(
-  ctx: CanvasRenderingContext2D, mode: string, T: number,
+  ctx: CanvasRenderingContext2D, mode: string, _T: number,
   CX: number, CY: number, R_IN: number, R_OUT: number, S: number, year: number, month: number,
   daysShort: string[], monthNames: string[]
 ) {
@@ -554,40 +591,87 @@ function drawEvents(
   viewDate = new Date()
 ) {
   const getAngle = (ev: CalendarEvent): { a1: number; a2: number } | null => {
-    const d = new Date(ev.date)
+    const startDate = new Date(ev.date + 'T00:00:00')
+    // Compute effective end date from endDate field or durationDays
+    let endDate: Date | null = null
+    if (ev.endDate) {
+      endDate = new Date(ev.endDate + 'T00:00:00')
+    } else if ((ev.durationDays ?? 0) > 1) {
+      endDate = new Date(startDate)
+      endDate.setDate(endDate.getDate() + (ev.durationDays ?? 1) - 1)
+    }
+
     if (mode === 'year') {
-      if (d.getFullYear() !== year) return null
-      const m = d.getMonth()
-      const dim = daysInMonth(year, m)
-      const day = d.getDate()
-      const ss = ang(m, 12); const sp = ang(m + 1, 12) - ss
-      return { a1: ss + ((day - 1) / dim) * sp, a2: ss + (day / dim) * sp }
+      // Check if event overlaps this year
+      const yearStart = new Date(year, 0, 1)
+      const yearEnd = new Date(year + 1, 0, 1)
+      if (startDate >= yearEnd) return null
+      if (endDate && endDate < yearStart) return null
+      if (!endDate && startDate.getFullYear() !== year) return null
+
+      // Clamp start to this year
+      const clampedStart = startDate < yearStart ? yearStart : startDate
+      // Clamp end to this year
+      const clampedEnd = endDate ? (endDate >= yearEnd ? new Date(year, 11, 31) : endDate) : clampedStart
+
+      const toYearFrac = (d: Date) => {
+        const m = d.getMonth(); const dim = daysInMonth(year, m); const day = d.getDate()
+        const ss = ang(m, 12); const sp = ang(m + 1, 12) - ss
+        return ss + ((day - 1) / dim) * sp
+      }
+      return { a1: toYearFrac(clampedStart), a2: toYearFrac(clampedEnd) + ang(1, 12) / daysInMonth(year, clampedEnd.getMonth()) }
     }
     if (mode === 'month') {
-      if (d.getFullYear() !== year || d.getMonth() !== month) return null
+      const monthStart = new Date(year, month, 1)
+      const monthEnd = new Date(year, month + 1, 1)
+      if (startDate >= monthEnd) return null
+      if (endDate && endDate < monthStart) return null
+      if (!endDate && (startDate.getFullYear() !== year || startDate.getMonth() !== month)) return null
+
       const dim = daysInMonth(year, month)
-      const day = d.getDate()
-      return { a1: ang(day - 1, dim), a2: ang(day, dim) }
+      const clampedStart = startDate < monthStart ? 1 : startDate.getDate()
+      const clampedEnd = endDate
+        ? (endDate >= monthEnd ? dim : endDate.getDate())
+        : clampedStart
+      return { a1: ang(clampedStart - 1, dim), a2: ang(clampedEnd, dim) }
     }
     if (mode === 'week') {
       const weekStart = getWeekStart(viewDate)
-      const diff = Math.floor((d.getTime() - weekStart.getTime()) / 86400000)
-      if (diff < 0 || diff >= 7) return null
-      return { a1: ang(diff, 7), a2: ang(diff + 1, 7) }
+      const weekEnd = new Date(weekStart); weekEnd.setDate(weekEnd.getDate() + 7)
+      if (startDate >= weekEnd) return null
+      if (endDate && endDate < weekStart) return null
+      const startDiff = Math.floor((startDate.getTime() - weekStart.getTime() + 43200000) / 86400000)
+      if (!endDate && (startDiff < 0 || startDiff >= 7)) return null
+
+      const clampedStart = Math.max(0, startDiff)
+      const endDiff = endDate
+        ? Math.floor((endDate.getTime() - weekStart.getTime() + 43200000) / 86400000)
+        : startDiff
+      const clampedEnd = Math.min(6, endDiff)
+      return { a1: ang(clampedStart, 7), a2: ang(clampedEnd + 1, 7) }
     }
     if (mode === 'day') {
       const dayView = new Date(viewDate); dayView.setHours(0, 0, 0, 0)
-      const evDay = new Date(ev.date)
+      const evDay = new Date(ev.date + 'T00:00:00')
       if (evDay.toDateString() !== dayView.toDateString()) return null
       const [hh, mm] = (ev.time || '00:00').split(':').map(Number)
-      const frac = (hh * 60 + mm) / (24 * 60)
-      return { a1: ang(frac * 24, 24), a2: ang(frac * 24 + 0.5, 24) }
+      const startMin = hh * 60 + mm
+      let endMin = startMin + 30
+      if (ev.endTime) {
+        const [eh, em] = ev.endTime.split(':').map(Number)
+        const candidate = eh * 60 + em
+        if (candidate > startMin) endMin = candidate
+      } else {
+        const durH = (ev.durationHours ?? 0) + (ev.durationMinutes ?? 0) / 60
+        if (durH > 0) endMin = startMin + durH * 60
+      }
+      return { a1: ang(startMin / 60, 24), a2: ang(endMin / 60, 24) }
     }
     return null
   }
 
   // Returns extended end angle for tasks with duration > one unit
-  const getTaskEndAngle = (ev: CalendarEvent, a1: number, a2: number): number => {
+  const getTaskEndAngle = (ev: CalendarEvent, _a1: number, a2: number): number => {
     if (mode === 'day') {
       if (ev.endTime) {
         const [eh, em] = ev.endTime.split(':').map(Number)
@@ -601,18 +685,18 @@ function drawEvents(
     }
     if (mode === 'week' && (ev.durationDays ?? 0) > 1) {
       const weekStart = getWeekStart(viewDate)
-      const d = new Date(ev.date)
-      const diff = Math.floor((d.getTime() - weekStart.getTime()) / 86400000)
+      const d = new Date(ev.date + 'T00:00:00')
+      const diff = Math.floor((d.getTime() - weekStart.getTime() + 43200000) / 86400000)
       return ang(Math.min(7, diff + (ev.durationDays ?? 1)), 7)
     }
     if (mode === 'month' && (ev.durationDays ?? 0) > 1) {
-      const d = new Date(ev.date)
+      const d = new Date(ev.date + 'T00:00:00')
       if (d.getFullYear() !== year || d.getMonth() !== month) return a2
       const dim = daysInMonth(year, month)
       return ang(Math.min(dim, d.getDate() - 1 + (ev.durationDays ?? 1)), dim)
     }
     if (mode === 'year' && (ev.durationDays ?? 0) > 15) {
-      const d = new Date(ev.date)
+      const d = new Date(ev.date + 'T00:00:00')
       if (d.getFullYear() !== year) return a2
       const m = d.getMonth()
       const dim = daysInMonth(year, m)
@@ -636,47 +720,61 @@ function drawEvents(
     const rMid = (ra + rb) / 2
 
     if (ev.itemType === 'task') {
-      // Draw thick arc line on ring midline spanning full duration
+      // Thin arc line on ring midline — doesn't block other content
       const a2End = getTaskEndAngle(ev, a1, a2)
-      const lineW = Math.max(3, (rb - ra) * 0.55)
+      const lineW = Math.max(2, (rb - ra) * 0.22)
       ctx.save()
       ctx.beginPath()
       ctx.arc(CX, CY, rMid, a1, a2End)
       ctx.strokeStyle = col
       ctx.lineWidth = lineW
-      ctx.globalAlpha = 0.85
+      ctx.globalAlpha = 0.6
       ctx.lineCap = 'round'
       ctx.stroke()
       ctx.restore()
       // Diamond marker at start
       const p = pxy(a1, rMid, CX, CY)
-      const cr = Math.max(3, Math.round(3.5 * S))
+      const cr = Math.max(4, Math.round(4.5 * S))
       ctx.save()
       ctx.translate(p.x, p.y)
       ctx.rotate(Math.PI / 4)
       ctx.beginPath()
       ctx.rect(-cr, -cr, cr * 2, cr * 2)
-      ctx.fillStyle = col; ctx.globalAlpha = 0.95; ctx.fill()
-      ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5; ctx.globalAlpha = 1; ctx.stroke()
+      ctx.fillStyle = col; ctx.globalAlpha = 1; ctx.fill()
+      ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.globalAlpha = 1; ctx.stroke()
       ctx.restore()
     } else {
+      const unitAngle = mode === 'day' ? Math.PI * 2 / 24
+        : mode === 'week' ? Math.PI * 2 / 7
+        : mode === 'month' ? Math.PI * 2 / daysInMonth(year, month)
+        : Math.PI * 2 / 12
+      // Outlined arc band: light category-color fill + solid border
       ctx.save()
-      ctx.globalAlpha = 0.85
       ctx.beginPath()
-      ctx.arc(CX, CY, rb, a1, a2)
-      ctx.arc(CX, CY, ra, a2, a1, true)
+      ctx.arc(CX, CY, rb - 1, a1, a2)
+      ctx.arc(CX, CY, ra + 1, a2, a1, true)
       ctx.closePath()
-      ctx.fillStyle = `rgba(${r},${g},${b},.45)`
+      ctx.fillStyle = `rgba(${r},${g},${b},0.18)`
+      ctx.globalAlpha = 1
       ctx.fill()
+      ctx.strokeStyle = col
+      ctx.lineWidth = 1.8
+      ctx.stroke()
       ctx.restore()
-
-      const daMid = (a1 + a2) / 2
-      const p = pxy(daMid, rMid, CX, CY)
-      const cr = Math.max(3, Math.round(3.5 * S))
+      // ★ near start of event
+      const starSpan = a2 - a1
+      const starA = a1 + Math.min(starSpan * 0.3, unitAngle * 0.45)
+      const sp = pxy(starA, rMid, CX, CY)
+      const fontSize = Math.max(8, Math.round(10 * S))
       ctx.save()
-      ctx.beginPath(); ctx.arc(p.x, p.y, cr, 0, Math.PI * 2)
-      ctx.fillStyle = '#fff'; ctx.globalAlpha = 0.9; ctx.fill()
-      ctx.strokeStyle = col; ctx.lineWidth = 1.5; ctx.globalAlpha = 1; ctx.stroke()
+      ctx.translate(sp.x, sp.y)
+      ctx.rotate(starA + Math.PI / 2)
+      ctx.textAlign = 'center'
+      ctx.textBaseline = 'middle'
+      ctx.font = `bold ${fontSize}px Arial`
+      ctx.fillStyle = col
+      ctx.globalAlpha = 1
+      ctx.fillText('★', 0, 0)
       ctx.restore()
     }
 
@@ -692,7 +790,9 @@ function drawEvents(
       ctx.textAlign = 'center'
       ctx.textBaseline = 'middle'
       // Background pill
-      const label = ev.title.length > 14 ? ev.title.slice(0, 13) + '…' : ev.title
+      const typeIcon = ev.itemType === 'task' ? '✅' : '📅'
+      const rawTitle = ev.title.length > 12 ? ev.title.slice(0, 11) + '…' : ev.title
+      const label = `${typeIcon} ${rawTitle}`
       const dateLabel = ev.time ? ev.time.slice(0, 5) : ev.date.slice(5)
       ctx.font = `700 ${fontSize}px 'Heebo'`
       const tw = ctx.measureText(label).width
@@ -733,10 +833,10 @@ function drawCriticalArc(
     critFrac = crit.month / dim
   } else {
     // year mode: crit.year is in months (default 2)
-    const start = new Date(year, 0, 1)
-    const elapsed = (now.getTime() - start.getTime()) / (365 * 24 * 3600000)
-    nowFrac = Math.min(1, Math.max(0, elapsed))
-    critFrac = ((crit.year ?? 2) * 30.5) / 365
+    const jan1 = new Date(year, 0, 1).getTime()
+    const yearMs = new Date(year + 1, 0, 1).getTime() - jan1
+    nowFrac = Math.min(1, Math.max(0, (now.getTime() - jan1) / yearMs))
+    critFrac = ((crit.year ?? 2) * 30.5 * 24 * 3600000) / yearMs
   }
 
   const startA = -Math.PI / 2 + nowFrac * Math.PI * 2
@@ -907,18 +1007,20 @@ function fracToDate(frac: number, mode: string, viewDate: Date): Date {
   return new Date(start.getTime() + Math.round(f * 24 * 60) * 60000)
 }
 
-function getEventFrac(ev: CalendarEvent, mode: string, year: number, month: number): number | null {
-  const d = new Date(ev.date)
+function getEventFrac(ev: CalendarEvent, mode: string, year: number, month: number, viewDate: Date): number | null {
+  const d = new Date(ev.date + 'T00:00:00')
   if (mode === 'day') {
-    if (d.toDateString() !== new Date().toDateString()) return null
+    const dayView = new Date(viewDate); dayView.setHours(0, 0, 0, 0)
+    if (d.toDateString() !== dayView.toDateString()) return null
     const [hh, mm] = (ev.time || '00:00').split(':').map(Number)
     return (hh * 60 + mm) / 1440
   }
   if (mode === 'week') {
-    const ws = getWeekStart(new Date())
-    const diff = Math.floor((d.getTime() - ws.getTime()) / 86400000)
+    const ws = getWeekStart(viewDate)
+    // +43200000 (12h) guards against DST-transition days that are only 23h long
+    const diff = Math.floor((d.getTime() - ws.getTime() + 43200000) / 86400000)
     if (diff < 0 || diff >= 7) return null
-    return d.getDay() / 7
+    return diff / 7
   }
   if (mode === 'month') {
     if (d.getFullYear() !== year || d.getMonth() !== month) return null
@@ -932,8 +1034,8 @@ function getEventFrac(ev: CalendarEvent, mode: string, year: number, month: numb
 function hitTestEvent(
   x: number, y: number, mode: string,
   events: CalendarEvent[], visibleCats: Category[],
-  CX: number, CY: number, S: number, canvasW: number,
-  year: number, month: number
+  CX: number, CY: number, S: number, _canvasW: number,
+  year: number, month: number, viewDate: Date
 ): CalendarEvent | null {
   const R_IN = 75 * S; const R_OUT = 278 * S
   const R_CAT_OUT = R_OUT - 14 * S
@@ -951,7 +1053,7 @@ function hitTestEvent(
     if (catIdx < 0) continue
     const ra = rings[catIdx]; const rb = rings[catIdx + 1]
     if (dist < ra || dist > rb) continue
-    const evFrac = getEventFrac(ev, mode, year, month)
+    const evFrac = getEventFrac(ev, mode, year, month, viewDate)
     if (evFrac === null) continue
     const diff = Math.min(Math.abs(frac - evFrac), 1 - Math.abs(frac - evFrac))
     if (diff < 0.06) return ev
@@ -961,7 +1063,7 @@ function hitTestEvent(
   for (const ev of events) {
     const catIdx = visibleCats.findIndex(c => c.id === ev.categoryId)
     if (catIdx < 0) continue
-    const evFrac = getEventFrac(ev, mode, year, month)
+    const evFrac = getEventFrac(ev, mode, year, month, viewDate)
     if (evFrac === null) continue
     const diff = Math.min(Math.abs(frac - evFrac), 1 - Math.abs(frac - evFrac))
     if (diff < 0.04) return ev

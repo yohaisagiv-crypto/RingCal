@@ -1,10 +1,10 @@
 apply plugin: 'com.android.application'
 
 android {
-    namespace = "com.spiraldiary.app"
+    namespace = "com.ringcal.app"
     compileSdk = rootProject.ext.compileSdkVersion
     defaultConfig {
-        applicationId "com.spiraldiary.app"
+        applicationId "com.ringcal.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
@@ -52,6 +52,14 @@ dependencies {
 }
 
 apply from: 'capacitor.build.gradle'
+
+// Override: project requires Java 17 (JDK 21 not available on this machine)
+android {
+  compileOptions {
+    sourceCompatibility JavaVersion.VERSION_17
+    targetCompatibility JavaVersion.VERSION_17
+  }
+}
 
 try {
     def servicesJSON = file('google-services.json')

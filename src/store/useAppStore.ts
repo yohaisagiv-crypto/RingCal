@@ -2,22 +2,93 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { CalendarEvent, Category, AppSettings, ViewMode, CriticalTime, RecurrenceRule } from '../types'
 
+function computeRollupDays(parentId: string, events: CalendarEvent[]): number {
+  const children = events.filter(e => e.parentId === parentId && !e.done)
+  if (children.length === 0) return 0
+  const memo = new Map<string, number>()
+  const visiting = new Set<string>()
+  const ef = (id: string): number => {
+    if (memo.has(id)) return memo.get(id)!
+    if (visiting.has(id)) return 1 // cycle — break with default duration
+    const ev = children.find(e => e.id === id)
+    if (!ev) return 0
+    const dur = ev.durationDays ?? 1
+    if (!ev.dependsOn) { memo.set(id, dur); return dur }
+    const dep = children.find(e => e.id === ev.dependsOn)
+    if (!dep) { memo.set(id, dur); return dur }
+    visiting.add(id)
+    const depEF = ef(dep.id)
+    visiting.delete(id)
+    const depDur = dep.durationDays ?? 1
+    const lagDays = Math.round((ev.lag ?? 0) / 24)
+    let start: number
+    switch (ev.dependsType ?? 'FS') {
+      case 'FS': start = depEF + lagDays; break
+      case 'SS': start = depEF - depDur + lagDays; break
+      case 'FF': start = depEF - dur + lagDays; break
+      case 'SF': start = depEF - depDur - dur + lagDays; break
+      default: start = depEF + lagDays
+    }
+    const result = Math.max(0, start) + dur
+    memo.set(id, result)
+    return result
+  }
+  let maxEF = 0
+  for (const child of children) maxEF = Math.max(maxEF, ef(child.id))
+  return maxEF
+}
+
+function applyRollup(events: CalendarEvent[]): CalendarEvent[] {
+  const parentIds = new Set(events.filter(e => e.parentId).map(e => e.parentId!))
+  if (parentIds.size === 0) return events
+  return events.map(e => {
+    if (!parentIds.has(e.id)) return e
+    const rollup = computeRollupDays(e.id, events)
+    if (rollup === 0) return e
+    const endDate = new Date(e.date + 'T00:00:00')
+    endDate.setDate(endDate.getDate() + rollup - 1)
+    const endStr = `${endDate.getFullYear()}-${String(endDate.getMonth() + 1).padStart(2, '0')}-${String(endDate.getDate()).padStart(2, '0')}`
+    return { ...e, durationDays: rollup, endDate: endStr }
+  })
+}
+
+function localDateStr(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
 function generateInstances(master: CalendarEvent): CalendarEvent[] {
   const rule: RecurrenceRule | undefined = master.recurrence
   if (!rule) return []
   const { interval, unit, endDate } = rule
-  const maxDate = endDate
-    ? new Date(endDate)
-    : (() => { const d = new Date(master.date); d.setFullYear(d.getFullYear() + 2); return d })()
+  if (interval <= 0) return []
+  const masterDate = new Date(master.date + 'T00:00:00')
+  const maxDateStr = endDate ?? (() => {
+    const d = new Date(masterDate); d.setFullYear(d.getFullYear() + 2); return localDateStr(d)
+  })()
+  const originalDay   = masterDate.getDate()
+  const originalMonth = masterDate.getMonth()
   const instances: CalendarEvent[] = []
-  const cur = new Date(master.date)
+  const cur = new Date(masterDate)
   while (true) {
-    if (unit === 'days')   cur.setDate(cur.getDate() + interval)
-    else if (unit === 'weeks')  cur.setDate(cur.getDate() + interval * 7)
-    else if (unit === 'months') cur.setMonth(cur.getMonth() + interval)
-    else if (unit === 'years')  cur.setFullYear(cur.getFullYear() + interval)
-    if (cur > maxDate) break
-    instances.push({ ...master, id: crypto.randomUUID(), date: cur.toISOString().slice(0, 10), recurrenceParentId: master.id, done: false })
+    if (unit === 'days')  cur.setDate(cur.getDate() + interval)
+    else if (unit === 'weeks') cur.setDate(cur.getDate() + interval * 7)
+    else if (unit === 'months') {
+      // setMonth(cur+n) overflows day (e.g. Jan 31 → Mar 2) — compute explicitly
+      const rawMonth = cur.getMonth() + interval
+      const nextYear  = cur.getFullYear() + Math.floor(rawMonth / 12)
+      const nextMonth = ((rawMonth % 12) + 12) % 12
+      const lastDay   = new Date(nextYear, nextMonth + 1, 0).getDate()
+      cur.setFullYear(nextYear, nextMonth, Math.min(originalDay, lastDay))
+    }
+    else if (unit === 'years') {
+      // setFullYear overflows day on Feb 29 in non-leap years — clamp to month's last day
+      const nextYear = cur.getFullYear() + interval
+      const lastDay  = new Date(nextYear, originalMonth + 1, 0).getDate()
+      cur.setFullYear(nextYear, originalMonth, Math.min(originalDay, lastDay))
+    }
+    const curStr = localDateStr(cur)
+    if (curStr > maxDateStr) break
+    instances.push({ ...master, id: crypto.randomUUID(), date: curStr, recurrenceParentId: master.id, done: false })
     if (instances.length >= 1000) break // safety cap
   }
   return instances
@@ -48,14 +119,18 @@ interface AppState {
   spiralGeneration: number
   bumpSpiralGeneration: () => void
 
+  subCalendarParentId: string | null
+  setSubCalendarParentId: (id: string | null) => void
+
   gcalConnected: boolean
   setGcalConnected: (v: boolean) => void
   patchEventGcalId: (id: string, gcalId: string) => void
 
   // Actions
-  addEvent: (ev: Omit<CalendarEvent, 'id'>) => void
+  addEvent: (ev: Omit<CalendarEvent, 'id'>) => string
   addRecurringEvent: (ev: Omit<CalendarEvent, 'id'>) => void
   updateEvent: (id: string, patch: Partial<CalendarEvent>) => void
+  batchUpdateSortOrder: (updates: { id: string; sortIndex: number }[]) => void
   deleteEvent: (id: string) => void
   deleteEventCascade: (id: string) => void
   setMode: (mode: ViewMode) => void
@@ -67,11 +142,12 @@ interface AppState {
   reorderCategory: (id: string, dir: -1 | 1) => void
   updateSettings: (patch: Partial<AppSettings>) => void
   updateCriticalTime: (patch: Partial<CriticalTime>) => void
+  importData: (data: { events?: CalendarEvent[]; categories?: Category[]; settings?: Partial<AppSettings> }) => void
 }
 
 export const useAppStore = create<AppState>()(
   persist(
-    (set, get) => ({
+    (set, _get) => ({
       events: [],
       categories: DEFAULT_CATS,
       settings: DEFAULT_SETTINGS,
@@ -80,6 +156,9 @@ export const useAppStore = create<AppState>()(
       viewDate: new Date(),
       spiralGeneration: 0,
       bumpSpiralGeneration: () => set(s => ({ spiralGeneration: s.spiralGeneration + 1 })),
+
+      subCalendarParentId: null,
+      setSubCalendarParentId: (id) => set({ subCalendarParentId: id }),
 
       gcalConnected: false,
 
@@ -90,29 +169,37 @@ export const useAppStore = create<AppState>()(
           events: s.events.map((e) => (e.id === id ? { ...e, gcalId } : e)),
         })),
 
-      addEvent: (ev) =>
-        set((s) => ({
-          events: [...s.events, { ...ev, id: crypto.randomUUID() }],
-        })),
+      addEvent: (ev) => {
+        const id = crypto.randomUUID()
+        set((s) => ({ events: applyRollup([...s.events, { ...ev, id }]) }))
+        return id
+      },
 
       addRecurringEvent: (ev) => {
         const master: CalendarEvent = { ...ev, id: crypto.randomUUID() }
         const instances = generateInstances(master)
-        set((s) => ({ events: [...s.events, master, ...instances] }))
+        set((s) => ({ events: applyRollup([...s.events, master, ...instances]) }))
       },
 
       updateEvent: (id, patch) =>
         set((s) => ({
-          events: s.events.map((e) => (e.id === id ? { ...e, ...patch } : e)),
+          events: applyRollup(s.events.map((e) => (e.id === id ? { ...e, ...patch } : e))),
         })),
 
+      batchUpdateSortOrder: (updates) => {
+        const map = new Map(updates.map(u => [u.id, u.sortIndex]))
+        set((s) => ({
+          events: s.events.map((e) => map.has(e.id) ? { ...e, sortIndex: map.get(e.id) } : e),
+        }))
+      },
+
       deleteEvent: (id) =>
-        set((s) => ({ events: s.events.filter((e) => e.id !== id) })),
+        set((s) => ({ events: applyRollup(s.events.filter((e) => e.id !== id)) })),
 
       deleteEventCascade: (id) =>
-        set((s) => ({ events: s.events.filter((e) => e.id !== id && e.recurrenceParentId !== id) })),
+        set((s) => ({ events: applyRollup(s.events.filter((e) => e.id !== id && e.recurrenceParentId !== id)) })),
 
-      setMode: (mode) => set({ mode, needle: new Date() }),
+      setMode: (mode) => { const n = new Date(); set({ mode, needle: n, viewDate: n }) },
 
       setNeedle: (needle) => set({ needle }),
 
@@ -159,6 +246,13 @@ export const useAppStore = create<AppState>()(
             ...s.settings,
             criticalTime: { ...s.settings.criticalTime, ...patch },
           },
+        })),
+
+      importData: (data) =>
+        set((s) => ({
+          events:     data.events     ? applyRollup(data.events.map(e => ({ ...e, itemType: e.itemType ?? 'event' }))) : s.events,
+          categories: data.categories ?? s.categories,
+          settings:   data.settings   ? { ...s.settings, ...data.settings, criticalTime: { ...s.settings.criticalTime, ...data.settings.criticalTime } } : s.settings,
         })),
 
     }),

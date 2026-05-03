@@ -18,10 +18,10 @@ function OAuthCallback() {
     const params = hash.slice(1)
     const isAndroid = /Android/i.test(navigator.userAgent)
     if (isAndroid) {
-      const url = 'intent://oauth?' + params + '#Intent;scheme=com.ringcal.app;package=com.spiraldiary.app;end;'
+      // Show button only — Chrome Custom Tab blocks JS-initiated navigations to custom schemes.
+      // User must tap the button to trigger the custom scheme (user gesture required).
+      const url = 'com.ringcal.app://oauth?' + params
       setIntentUrl(url)
-      // Also try auto-redirect (may be blocked, button is fallback)
-      setTimeout(() => { window.location.href = url }, 300)
     } else {
       window.opener?.postMessage(window.location.href, window.location.origin)
       window.close()
@@ -31,12 +31,13 @@ function OAuthCallback() {
   if (error) return <div style={{ padding: 32, textAlign: 'center' }}>שגיאה — לא נמצא טוקן</div>
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh', gap: 16 }}>
-      <p>מחבר לאפליקציה...</p>
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh', gap: 24, padding: 32, textAlign: 'center' }}>
+      <p style={{ fontSize: 20, fontWeight: 'bold', margin: 0 }}>אישור התקבל!</p>
+      <p style={{ margin: 0, color: '#555' }}>לחץ על הכפתור כדי לחזור לאפליקציה</p>
       {intentUrl && (
         <a
           href={intentUrl}
-          style={{ padding: '12px 24px', background: '#4285f4', color: 'white', borderRadius: 12, textDecoration: 'none', fontSize: 18, fontWeight: 'bold' }}
+          style={{ padding: '16px 32px', background: '#4285f4', color: 'white', borderRadius: 16, textDecoration: 'none', fontSize: 20, fontWeight: 'bold', display: 'block' }}
         >
           פתח את RingCal
         </a>

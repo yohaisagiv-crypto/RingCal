@@ -4,9 +4,9 @@ interface Props {
 
 const STEPS = [
   {
-    icon: '🌀',
-    title: 'ברוכים הבאים ללוח הספירלה',
-    text: 'לוח שנה בצורת עיגול — 12 בלילה למעלה, כיוון השעון = קדימה בזמן.',
+    icon: '🔵',
+    title: 'ברוכים הבאים ל-RingCal',
+    text: 'לוח שנה חכם בצורת טבעות מעגליות — 12 בלילה למעלה, כיוון השעון = קדימה בזמן.',
   },
   {
     icon: '🔴',
@@ -15,18 +15,28 @@ const STEPS = [
   },
   {
     icon: '➕',
-    title: 'הוספת אירוע',
-    text: 'לחץ על ה-+ הכחול, או לחץ על מקום ריק בלוח — ייפתח טופס עם התאריך שבחרת.',
+    title: 'הוספת אירוע או מטלה',
+    text: 'לחץ על + הכחול ובחר "אירוע" או "מטלה". אפשר גם ללחוץ על מקום ריק בלוח — ייפתח טופס עם התאריך שבחרת.',
   },
   {
     icon: '📋',
     title: 'קטגוריות וטבעות',
-    text: 'כל קטגוריה מוצגת בטבעת נפרדת. לחץ על שם הקטגוריה בסרגל למעלה להסתיר/להציג.',
+    text: 'כל קטגוריה מוצגת בטבעת נפרדת. לחץ על שם הקטגוריה בסרגל הקטגוריות להסתיר/להציג אותה.',
+  },
+  {
+    icon: '✅',
+    title: 'מטלות ותת-מטלות',
+    text: 'כל מטלה יכולה להכיל תת-מטלות עם יומן מעגלי משלה. לחץ "פתח תת-יומן" בתוך המטלה.',
   },
   {
     icon: '🗓',
     title: 'מצבי תצוגה',
-    text: 'יומי, שבועי, חודשי, שנתי — עברו בין המצבים בסרגל התחתון.',
+    text: 'יומי, שבועי, חודשי, שנתי — עברו בין המצבים בסרגל בחלק העליון של המסך.',
+  },
+  {
+    icon: '📅',
+    title: 'Google Calendar',
+    text: 'חברו את חשבון Google Calendar לסנכרון דו-כיווני. אירועים חדשים מגוגל יופיעו עם כפתורי מאשר/דוחה.',
   },
 ]
 
@@ -39,12 +49,12 @@ export default function OnboardingScreen({ onDone }: Props) {
       {/* Logo area */}
       <div className="flex flex-col items-center gap-3">
         <div className="w-20 h-20 rounded-3xl bg-white/20 flex items-center justify-center text-5xl shadow-xl">
-          🌀
+          🔵
         </div>
         <h1 className="text-2xl font-black text-white text-center leading-snug">
-          לוח הספירלה
+          RingCal
         </h1>
-        <p className="text-blue-200 text-sm text-center">לוח שנה חכם בצורת עיגול</p>
+        <p className="text-blue-200 text-sm text-center">לוח שנה חכם בצורת טבעות מעגליות</p>
       </div>
 
       {/* Feature cards */}

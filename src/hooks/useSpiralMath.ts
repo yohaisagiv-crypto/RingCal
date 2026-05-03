@@ -13,6 +13,11 @@ export function pxy(a: number, r: number, cx: number, cy: number) {
   return { x: cx + Math.cos(a) * r, y: cy + Math.sin(a) * r }
 }
 
+/** Format a Date as a local YYYY-MM-DD string (avoids UTC offset bugs from toISOString) */
+export function localISODate(d = new Date()): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
 /** Days in a given month */
 export function daysInMonth(year: number, month: number): number {
   return new Date(year, month + 1, 0).getDate()
@@ -59,7 +64,7 @@ export function elapsedFraction(mode: string, now: Date, year: number, month: nu
     return (now.getDate() - 1 + (now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds()) / 86400) / dim
   }
   if (mode === 'week') {
-    return (now.getDay() + (now.getHours() * 3600 + now.getMinutes() * 60) / 86400) / 7
+    return (now.getDay() + (now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds()) / 86400) / 7
   }
   // day
   return (now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds()) / 86400
@@ -82,7 +87,6 @@ export function criticalArcEnd(
   year: number,
   month: number
 ): number {
-  const T = segmentsForMode(mode, year, month)
   if (mode === 'day') {
     const nowFrac = elapsedFraction('day', now, year, month)
     return ang(0, 1) + nowFrac * Math.PI * 2 + (critHours / 24) * Math.PI * 2

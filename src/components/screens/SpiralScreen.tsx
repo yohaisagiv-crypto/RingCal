@@ -1,10 +1,11 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import TopBar from '../TopBar'
 import NeedleBar from '../NeedleBar'
 import CategoryStrip from '../CategoryStrip'
 import SpiralCanvas from '../SpiralCanvas'
 import EventSheet from '../EventSheet'
 import UpcomingStrip from '../UpcomingStrip'
+import SearchOverlay from '../SearchOverlay'
 import { useAppStore } from '../../store/useAppStore'
 import { useLang } from '../../hooks/useLang'
 import type { CalendarEvent } from '../../types'
@@ -12,36 +13,57 @@ import * as gcal from '../../services/googleCalendar'
 
 interface Props {
   onNavigate: (page: number) => void
+  filterCats?: string[]
+  filterType?: 'all' | 'event' | 'task'
 }
 
-export default function SpiralScreen({ onNavigate }: Props) {
+export default function SpiralScreen({ onNavigate, filterCats = [], filterType = 'all' }: Props) {
   const [sheetEvent, setSheetEvent] = useState<CalendarEvent | null>(null)
   const [addDate, setAddDate] = useState<Date | null>(null)
   const [addType, setAddType] = useState<'event' | 'task'>('event')
   const [showFabMenu, setShowFabMenu] = useState(false)
-  const [showMenu, setShowMenu] = useState(false)
-  const [showHelp, setShowHelp] = useState(false)
   const [showSearch, setShowSearch] = useState(false)
-  const [searchQuery, setSearchQuery] = useState('')
-  const { events, settings, updateSettings, gcalConnected, addEvent, patchEventGcalId, categories, needle } = useAppStore()
-  const { tr, rtl } = useLang()
+  const [filterCat, setFilterCat] = useState<string | null>(null)
+  const { events, gcalConnected, needle, spiralGeneration } = useAppStore()
+  const filteredEventsOverride = (filterCats.length > 0 || filterType !== 'all' || filterCat)
+    ? events
+        .filter(e => filterCats.length === 0 || filterCats.includes(e.categoryId))
+        .filter(e => filterType === 'all' || e.itemType === filterType)
+        .filter(e => !filterCat || e.categoryId === filterCat)
+    : undefined
+  const { tr } = useLang()
+  const pendingCount = events.filter(e => e.rsvpStatus === 'pending').length
 
   const closeSheet = () => { setSheetEvent(null); setAddDate(null) }
 
+  const prevGenRef = useRef(spiralGeneration)
   useEffect(() => {
+    if (prevGenRef.current !== spiralGeneration) {
+      prevGenRef.current = spiralGeneration
+      closeSheet()
+      setShowFabMenu(false)
+      setShowSearch(false)
+    }
+  }, [spiralGeneration])
+
+  useEffect(() => {
+    let lastPullTs = 0
     const pull = async () => {
       if (!gcalConnected || !gcal.isConnected()) return
+      const now = Date.now()
+      if (now - lastPullTs < 5 * 60_000) return  // throttle: max once per 5 min
+      lastPullTs = now
       try {
-        const since = new Date(new Date().getFullYear() - 3, 0, 1)
+        // Only fetch 30 days back + future — historical import is done via EventsScreen
+        const since = new Date(now - 30 * 86_400_000)
         const gcalEvents = await gcal.fetchFutureEvents(since)
         const existingIds = new Set(useAppStore.getState().events.map(e => e.gcalId).filter(Boolean))
         for (const ge of gcalEvents) {
           if (existingIds.has(ge.id)) continue
           const imported = gcal.fromGcalEvent(ge)
           const cat = useAppStore.getState().categories[0]?.id ?? ''
-          useAppStore.getState().addEvent({ ...imported, categoryId: cat, priority: 'N', done: false, links: [], files: [] })
-          const newEv = useAppStore.getState().events.find(e => e.title === imported.title && e.date === imported.date && !e.gcalId)
-          if (newEv) useAppStore.getState().patchEventGcalId(newEv.id, ge.id)
+          const newId = useAppStore.getState().addEvent({ ...imported, itemType: 'event', categoryId: cat, priority: 'N', done: false, links: [], files: [] })
+          useAppStore.getState().patchEventGcalId(newId, ge.id)
         }
       } catch { /* silent */ }
     }
@@ -51,19 +73,28 @@ export default function SpiralScreen({ onNavigate }: Props) {
     return () => document.removeEventListener('visibilitychange', onVisible)
   }, [gcalConnected])
 
-  const filtered = searchQuery.trim()
-    ? events.filter(e => e.title.includes(searchQuery) || (e.note ?? '').includes(searchQuery))
-    : []
-
   return (
     <div className="flex flex-col h-full relative bg-[#f5f5f7]">
       <TopBar />
-      <NeedleBar onMenu={() => setShowMenu(true)} onSearch={() => setShowSearch(true)} />
-      <CategoryStrip />
-      <UpcomingStrip onTap={(ev) => { setSheetEvent(ev); setAddDate(null) }} />
+      <NeedleBar onSearch={() => setShowSearch(true)} />
+      {pendingCount > 0 && (
+        <button
+          onClick={() => onNavigate(1)}
+          className="flex-shrink-0 flex items-center gap-2 px-3 py-2 bg-blue-600 text-white text-xs font-bold active:bg-blue-700 transition-colors"
+        >
+          <span className="w-5 h-5 rounded-full bg-red-500 text-white text-[10px] font-black flex items-center justify-center flex-shrink-0">{pendingCount}</span>
+          <span className="flex-1 text-right">{tr.pendingNotice}</span>
+          <span className="text-white/70 text-base">›</span>
+        </button>
+      )}
+      <CategoryStrip onParams={() => onNavigate(4)} filterCat={filterCat} onFilter={setFilterCat} />
+      <div className="lg:hidden">
+        <UpcomingStrip onTap={(ev) => { setSheetEvent(ev); setAddDate(null) }} eventsOverride={filteredEventsOverride} />
+      </div>
       <SpiralCanvas
         onTapEmpty={(d) => { setAddDate(d); setSheetEvent(null) }}
         onTapEvent={(ev) => { setSheetEvent(ev); setAddDate(null) }}
+        eventsOverride={filteredEventsOverride}
       />
 
       {/* FAB menu */}
@@ -76,14 +107,14 @@ export default function SpiralScreen({ onNavigate }: Props) {
               className="flex items-center gap-2 px-4 py-2.5 bg-white rounded-full shadow-lg text-sm font-extrabold text-gray-700 border border-gray-200"
             >
               <span className="w-7 h-7 rounded-full bg-green-500 text-white flex items-center justify-center text-base font-black">✅</span>
-              מטלה חדשה
+              {tr.newTask}
             </button>
             <button
               onClick={() => { setShowFabMenu(false); setAddType('event'); setAddDate(needle); setSheetEvent(null) }}
               className="flex items-center gap-2 px-4 py-2.5 bg-white rounded-full shadow-lg text-sm font-extrabold text-gray-700 border border-gray-200"
             >
               <span className="w-7 h-7 rounded-full bg-blue-500 text-white flex items-center justify-center text-base font-black">📅</span>
-              אירוע חדש
+              {tr.newEvent}
             </button>
           </div>
         </>
@@ -102,137 +133,14 @@ export default function SpiralScreen({ onNavigate }: Props) {
         <EventSheet event={sheetEvent} defaultDate={addDate} defaultItemType={addType} onClose={closeSheet} />
       )}
 
-      {/* Menu overlay */}
-      {showMenu && (
-        <>
-          <div className="absolute inset-0 bg-black/40 z-40" onClick={() => setShowMenu(false)} />
-          <div dir={rtl ? 'rtl' : 'ltr'} className="absolute top-0 right-0 h-full w-64 bg-white shadow-2xl z-50 flex flex-col pt-8 px-4 gap-2">
-            <p className="text-xs font-mono text-gray-400 uppercase tracking-widest mb-1">{tr.mainMenu}</p>
-
-            {/* Language quick-switch — at top */}
-            <div className="px-1 pb-1 mb-1 border-b border-gray-100">
-              <p className="text-[9px] font-mono text-gray-400 uppercase tracking-widest mb-2">שפה / Language</p>
-              <div className="flex flex-wrap gap-1.5">
-                {[
-                  { code: 'he', label: 'עב' }, { code: 'en', label: 'EN' },
-                  { code: 'fr', label: 'FR' }, { code: 'es', label: 'ES' },
-                  { code: 'de', label: 'DE' }, { code: 'ru', label: 'RU' },
-                  { code: 'ar', label: 'عر' }, { code: 'zh', label: '中' },
-                  { code: 'pt', label: 'PT' },
-                ].map(l => (
-                  <button
-                    key={l.code}
-                    onClick={() => updateSettings({ language: l.code })}
-                    className={`px-2.5 py-1 rounded-full text-xs font-bold border transition-all ${
-                      settings.language === l.code
-                        ? 'bg-blue-500 text-white border-blue-500'
-                        : 'bg-gray-50 text-gray-600 border-gray-200'
-                    }`}
-                  >
-                    {l.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <button
-              onClick={() => { setShowMenu(false); setShowHelp(true) }}
-              className="flex items-center gap-3 px-4 py-3 rounded-xl bg-blue-50 text-blue-700 font-bold text-sm text-right"
-            >
-              <span className="text-xl">❓</span>
-              {tr.helpTitle}
-            </button>
-            {[
-              { icon: '🌀', label: tr.ringcal, page: 0 },
-              { icon: '📋', label: tr.eventsList, page: 1 },
-              { icon: '✅', label: 'מטלות', page: 2 },
-              { icon: '🤖', label: 'AI', page: 3 },
-              { icon: '⚙️', label: tr.settings, page: 4 },
-            ].map(item => (
-              <button
-                key={item.page}
-                onClick={() => { setShowMenu(false); onNavigate(item.page) }}
-                className="flex items-center gap-3 px-4 py-3 rounded-xl bg-gray-50 hover:bg-blue-50 text-gray-800 font-bold text-sm text-right"
-              >
-                <span className="text-xl">{item.icon}</span>
-                {item.label}
-              </button>
-            ))}
-            <div className="flex-1" />
-            <button onClick={() => setShowMenu(false)} className="mb-4 text-sm text-gray-400 font-bold py-2">{tr.close}</button>
-          </div>
-        </>
-      )}
-
-      {/* Help overlay */}
-      {showHelp && (
-        <>
-          <div className="absolute inset-0 bg-black/50 z-40" onClick={() => setShowHelp(false)} />
-          <div dir="rtl" className="absolute inset-x-2 top-6 bottom-6 bg-white rounded-2xl shadow-2xl z-50 overflow-y-auto">
-            <div className="sticky top-0 bg-white border-b border-gray-100 px-4 py-3 flex items-center justify-between">
-              <span className="font-bold text-base text-gray-800">❓ {tr.helpTitle}</span>
-              <button onClick={() => setShowHelp(false)} className="w-8 h-8 rounded-full bg-gray-100 text-gray-500 font-black flex items-center justify-center">✕</button>
-            </div>
-            <div className="px-4 py-4 flex flex-col gap-5 text-sm text-gray-700 leading-relaxed">
-              {tr.help.map((s) => (
-                <HelpSection key={s.title} title={s.title} text={s.text} />
-              ))}
-            </div>
-          </div>
-        </>
-      )}
-
-      {/* Search overlay */}
       {showSearch && (
-        <>
-          <div className="absolute inset-0 bg-black/40 z-40" onClick={() => { setShowSearch(false); setSearchQuery('') }} />
-          <div dir="rtl" className="absolute top-0 left-0 right-0 bg-white shadow-2xl z-50 px-4 pb-4 pt-3">
-            <div className="flex items-center gap-2 mb-3">
-              <input
-                autoFocus
-                value={searchQuery}
-                onChange={e => setSearchQuery(e.target.value)}
-                placeholder={tr.searchPlaceholder}
-                className="flex-1 bg-gray-50 border-2 border-blue-300 rounded-xl px-3 py-2 text-sm font-bold outline-none"
-                dir="rtl"
-              />
-              <button
-                onClick={() => { setShowSearch(false); setSearchQuery('') }}
-                className="w-9 h-9 bg-gray-100 rounded-xl text-gray-500 font-black flex items-center justify-center flex-shrink-0"
-              >
-                ✕
-              </button>
-            </div>
-            {searchQuery.trim() && (
-              <div className="max-h-60 overflow-y-auto flex flex-col gap-1">
-                {filtered.length === 0
-                  ? <p className="text-sm text-gray-400 text-center py-4">{tr.noResults}</p>
-                  : filtered.map(ev => (
-                    <button
-                      key={ev.id}
-                      onClick={() => { setSheetEvent(ev); setShowSearch(false); setSearchQuery('') }}
-                      className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-gray-50 text-right"
-                    >
-                      <div className="flex-1">
-                        <p className="text-sm font-bold text-gray-800">{ev.title}</p>
-                        <p className="text-[10px] text-gray-400 font-mono">{ev.date} {ev.time}</p>
-                      </div>
-                    </button>
-                  ))}
-              </div>
-            )}
-          </div>
-        </>
+        <SearchOverlay
+          events={events}
+          onClose={() => setShowSearch(false)}
+          onSelect={ev => { setSheetEvent(ev); setShowSearch(false) }}
+        />
       )}
     </div>
   )
 }
 
-function HelpSection({ title, text }: { title: string; text: string }) {
-  return (
-    <div className="bg-gray-50 rounded-xl p-3">
-      <p className="font-bold text-gray-800 mb-1">{title}</p>
-      <p className="text-gray-600 text-sm leading-relaxed">{text}</p>
-    </div>
-  )
-}

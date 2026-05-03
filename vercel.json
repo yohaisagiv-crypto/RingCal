@@ -8,6 +8,7 @@
     { "source": "/logo192.png", "destination": "/logo192.png" },
     { "source": "/logo512.png", "destination": "/logo512.png" },
     { "source": "/oauth", "destination": "/oauth.html" },
+    { "source": "/.well-known/assetlinks.json", "destination": "/.well-known/assetlinks.json" },
     { "source": "/(.*)", "destination": "/index.html" }
   ],
   "headers": [
