@@ -137,6 +137,7 @@ interface AppState {
   setNeedle: (date: Date) => void
   setViewDate: (date: Date) => void
   updateCategory: (id: string, patch: Partial<Category>) => void
+  soloCategory: (id: string | null) => void
   addCategory: (cat: Omit<Category, 'id'>) => void
   deleteCategory: (id: string) => void
   reorderCategory: (id: string, dir: -1 | 1) => void
@@ -208,6 +209,11 @@ export const useAppStore = create<AppState>()(
       updateCategory: (id, patch) =>
         set((s) => ({
           categories: s.categories.map((c) => (c.id === id ? { ...c, ...patch } : c)),
+        })),
+
+      soloCategory: (id) =>
+        set((s) => ({
+          categories: s.categories.map((c) => ({ ...c, hidden: id !== null && c.id !== id })),
         })),
 
       addCategory: (cat) =>

@@ -138,12 +138,14 @@ export default function UpcomingStrip({ onTap, eventsOverride }: Props) {
     if (diff < closestDiff) { closestDiff = diff; activeId = ev.id }
   }
 
-  // Scroll active item into view when needle changes
+  // Scroll active item into view when needle changes (direct scrollLeft to avoid parent scroll on Android)
   useEffect(() => {
     if (!activeId) return
     const el = itemRefs.current.get(activeId)
-    if (el && stripRef.current) {
-      el.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' })
+    const strip = stripRef.current
+    if (el && strip) {
+      const targetLeft = el.offsetLeft - (strip.clientWidth - el.offsetWidth) / 2
+      strip.scrollTo({ left: Math.max(0, targetLeft), behavior: 'smooth' })
     }
   }, [activeId])
 

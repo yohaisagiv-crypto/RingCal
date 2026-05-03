@@ -24,7 +24,7 @@ export default function SpiralScreen({ onNavigate, filterCats = [], filterType =
   const [showFabMenu, setShowFabMenu] = useState(false)
   const [showSearch, setShowSearch] = useState(false)
   const [filterCat, setFilterCat] = useState<string | null>(null)
-  const { events, gcalConnected, needle, spiralGeneration } = useAppStore()
+  const { events, gcalConnected, needle, spiralGeneration, soloCategory } = useAppStore()
   const filteredEventsOverride = (filterCats.length > 0 || filterType !== 'all' || filterCat)
     ? events
         .filter(e => filterCats.length === 0 || filterCats.includes(e.categoryId))
@@ -35,6 +35,11 @@ export default function SpiralScreen({ onNavigate, filterCats = [], filterType =
   const pendingCount = events.filter(e => e.rsvpStatus === 'pending').length
 
   const closeSheet = () => { setSheetEvent(null); setAddDate(null) }
+
+  const handleFilterCat = (catId: string | null) => {
+    setFilterCat(catId)
+    soloCategory(catId)
+  }
 
   const prevGenRef = useRef(spiralGeneration)
   useEffect(() => {
@@ -87,7 +92,7 @@ export default function SpiralScreen({ onNavigate, filterCats = [], filterType =
           <span className="text-white/70 text-base">›</span>
         </button>
       )}
-      <CategoryStrip onParams={() => onNavigate(4)} filterCat={filterCat} onFilter={setFilterCat} />
+      <CategoryStrip onParams={() => onNavigate(4)} filterCat={filterCat} onFilter={handleFilterCat} />
       <div className="lg:hidden">
         <UpcomingStrip onTap={(ev) => { setSheetEvent(ev); setAddDate(null) }} eventsOverride={filteredEventsOverride} />
       </div>

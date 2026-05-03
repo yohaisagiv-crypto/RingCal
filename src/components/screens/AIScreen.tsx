@@ -3,6 +3,7 @@ import { NativeInput } from '../NativeInput'
 import { useAppStore } from '../../store/useAppStore'
 import { useLang } from '../../hooks/useLang'
 import EventSheet from '../EventSheet'
+import { GEMINI_SYSTEM_PROMPT } from '../../constants/geminiSystemPrompt'
 import type { CalendarEvent } from '../../types'
 
 interface Props { onBack: () => void; onMenu?: () => void }
@@ -15,34 +16,6 @@ const ATTEMPTS = [
   { v: 'v1beta', m: 'gemini-1.5-flash' },
 ]
 
-const APP_CONTEXT = `RingCal היא אפליקציית יומן ספירלי ייחודית.
-
-תצוגה: היומן מוצג כטבעות קונצנטריות עגולות. 12 בלילה למעלה, כיוון השעון = קדימה בזמן. מצבי תצוגה: יום/שבוע/חודש/שנה — כל מצב מציג טווח זמן שונה על אותו לוח עגול.
-
-מחוג אדום: מצביע על נקודת הזמן הנוכחית. ניתן לגרור אותו. לחיצה ראשונה = מזיז מחוג. לחיצה שנייה באותו מקום = פותחת/יוצרת אירוע. כפתורי ← → בסרגל = דלג לאירוע הקודם/הבא בזמן.
-
-קשת אדומה: מציגה את "הזמן הקריטי" — הפרק הקרוב ביותר שצריך לשים לב אליו. גודל הקשת ניתן לכיוון בהגדרות.
-
-פריטים — שני סוגים:
-• אירועים (events): יש להם תאריך ושעה אופציונלית, יכולים להיות "כל היום".
-• מטלות (tasks): יש להן תאריך יעד, ניתנות לסימון כ"הושלמו".
-
-כל פריט כולל: כותרת, קטגוריה, עדיפות (נמוכה/רגילה/גבוהה/דחוף), הערות, מיקום, קישורים, חזרתיות (ימים/שבועות/חודשים/שנים).
-
-קטגוריות: לכל אירוע/מטלה יש קטגוריה עם שם, צבע ואייקון. כל קטגוריה מוצגת כטבעת נפרדת בלוח. המשתמש יכול ליצור, לערוך ולמחוק קטגוריות. ניתן לסנן לפי קטגוריה.
-
-תת-מטלות (sub-tasks): מטלה יכולה להכיל תת-מטלות עם תת-יומן משלה. ניתן לראות תת-יומן מפורט מתוך כרטיס העריכה של מטלה. הקשרים בין מטלות מחשבים אוטומטית משך זמן כולל.
-
-קישורים בין אירועים: ניתן לקשר בין אירועים/מטלות (FS=סוף→התחלה, SS=התחלה→התחלה, FF=סוף→סוף, SF=התחלה→סוף) עם משך זמן ביניהם.
-
-RSVP: אירועים יכולים להיות במצב: pending (ממתין), accepted (מאושר), declined (נדחה). הזמנות ממתינות מסומנות עם 📬 ומקבלות עדיפות בתצוגה.
-
-Google Calendar: סנכרון דו-כיווני — ייבוא וייצוא אירועים. אירועים מ-GCal מסומנים עם "G". ניתן לייבא היסטוריה (עד 20 שנה אחורה). Google Drive: גיבוי ושחזור נתונים בין מכשירים.
-
-ניווט: לחיצה על נקודה בספירלה פותחת אירוע. כרטיסיית "אירועים" = רשימה עם חיפוש, סינון לפי קטגוריה/שנה/חודש/GCal. כרטיסיית "מטלות" = מטלות פעילות + מושלמות עם ניהול עדיפויות וגרירה. כרטיסיית "הגדרות" = קטגוריות, שפה, Google Calendar, ייצוא/ייבוא.
-
-שפות: עברית, אנגלית, ערבית, צרפתית, ספרדית, גרמנית, רוסית, סינית, פורטוגלית.`
-
 function buildContext(
   events: ReturnType<typeof useAppStore.getState>['events'],
   categories: ReturnType<typeof useAppStore.getState>['categories']
@@ -50,15 +23,31 @@ function buildContext(
   const catMap = Object.fromEntries(categories.map(c => [c.id, c]))
   const today = new Date().toISOString().slice(0, 10)
   const tasks = events.filter(e => e.itemType === 'task' && !e.done)
-  const upcoming = events.filter(e => e.itemType !== 'task' && !e.done && e.date >= today).slice(0, 10)
-  const catLines = categories.map(c => `- ${c.icon} ${c.name} (${c.color})`).join('\n') || 'אין קטגוריות'
+  const upcoming = events.filter(e => e.itemType !== 'task' && !e.done && e.date >= today).slice(0, 15)
+  const overdue = events.filter(e => !e.done && e.date < today).slice(0, 10)
+  const catLines = categories.map(c => `- ${c.icon} ${c.name}`).join('\n') || 'No categories'
   const taskLines = tasks.map(t =>
-    `- ${t.title}${t.date ? ` (יעד: ${t.date})` : ''}${catMap[t.categoryId] ? ` [${catMap[t.categoryId].name}]` : ''}${t.note ? `: ${t.note}` : ''}`
-  ).join('\n') || 'אין מטלות פעילות'
+    `- [${t.priority ?? 'N'}] ${t.title}${t.date ? ` (due: ${t.date})` : ''}${catMap[t.categoryId] ? ` [${catMap[t.categoryId].name}]` : ''}${t.note ? ` — ${t.note}` : ''}`
+  ).join('\n') || 'No active tasks'
   const eventLines = upcoming.map(e =>
-    `- ${e.title} (${e.date}${e.time ? ' ' + e.time : ''})${catMap[e.categoryId] ? ` [${catMap[e.categoryId].name}]` : ''}`
-  ).join('\n') || 'אין אירועים קרובים'
-  return `${APP_CONTEXT}\n\nהיום: ${today}\n\nקטגוריות:\n${catLines}\n\nמטלות פעילות:\n${taskLines}\n\nאירועים קרובים:\n${eventLines}`
+    `- ${e.title} (${e.date}${e.time ? ' ' + e.time : ''})${catMap[e.categoryId] ? ` [${catMap[e.categoryId].name}]` : ''}${e.rsvpStatus === 'pending' ? ' [PENDING RSVP]' : ''}`
+  ).join('\n') || 'No upcoming events'
+  const overdueLines = overdue.length > 0
+    ? overdue.map(e => `- ${e.title} (was due: ${e.date})`).join('\n')
+    : 'None'
+  return `TODAY: ${today}
+
+CATEGORIES:
+${catLines}
+
+ACTIVE TASKS (priority: H=high N=normal L=low):
+${taskLines}
+
+UPCOMING EVENTS (next 15):
+${eventLines}
+
+OVERDUE ITEMS:
+${overdueLines}`
 }
 
 interface GeminiMsgs {
@@ -69,7 +58,7 @@ interface GeminiMsgs {
   connectionError: string
 }
 
-async function callGemini(apiKey: string, fullPrompt: string, msgs: GeminiMsgs): Promise<string> {
+async function callGemini(apiKey: string, userPrompt: string, msgs: GeminiMsgs): Promise<string> {
   let lastError = ''
   for (const { v, m } of ATTEMPTS) {
     const res = await fetch(
@@ -77,7 +66,10 @@ async function callGemini(apiKey: string, fullPrompt: string, msgs: GeminiMsgs):
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ contents: [{ parts: [{ text: fullPrompt }] }] }),
+        body: JSON.stringify({
+          systemInstruction: { parts: [{ text: GEMINI_SYSTEM_PROMPT }] },
+          contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
+        }),
       }
     )
     if (res.status === 429 || res.status === 404) { lastError = `${m} ${msgs.modelUnavailable}`; continue }
@@ -126,11 +118,10 @@ export default function AIScreen({ onBack, onMenu }: Props) {
     const questionText = q.id === 'free' ? freeText.trim() : q.prompt
     if (!questionText) return
     if (!apiKey) { setShowSetup(true); return }
-    const context = buildContext(events, categories)
-    const fullPrompt = `${context}\n\n${questionText}\n\n${tr.aiResponseLang}`
+    const userPrompt = `${buildContext(events, categories)}\n\n${questionText}\n\n${tr.aiResponseLang}`
     setLoading(true); setError('')
     try {
-      const newAnswer = await callGemini(apiKey, fullPrompt, {
+      const newAnswer = await callGemini(apiKey, userPrompt, {
         modelUnavailable: tr.aiModelUnavailable,
         keyInvalid: tr.aiKeyInvalid,
         serverError: tr.aiServerError,

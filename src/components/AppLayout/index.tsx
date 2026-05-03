@@ -59,7 +59,7 @@ export default function AppLayout() {
   const [page, setPage] = useState(0)
   const {
     bumpSpiralGeneration, subCalendarParentId, setSubCalendarParentId,
-    events, categories, settings, mode, gcalConnected, importData, updateSettings,
+    events, categories, settings, mode, needle, gcalConnected, importData, updateSettings,
   } = useAppStore()
   const { tr, rtl } = useLang()
   const pendingCount = events.filter(e => e.rsvpStatus === 'pending').length
@@ -71,6 +71,8 @@ export default function AppLayout() {
   const [showCatFilter, setShowCatFilter] = useState(false)
   const [rightTypeFilter, setRightTypeFilter] = useState<'all' | 'event' | 'task'>('all')
   const [rightPanelOpen, setRightPanelOpen] = useState(true)
+  const rightListRef = useRef<HTMLDivElement>(null)
+  const rightItemRefs = useRef<Map<string, HTMLButtonElement>>(new Map())
 
   // ── Drive sync ──
   useEffect(() => {
@@ -142,6 +144,28 @@ export default function AppLayout() {
     .sort((a, b) => (a.date + (a.time ?? '')) < (b.date + (b.time ?? '')) ? -1 : 1)
     .slice(0, 60)
   const catMap = Object.fromEntries(categories.map(c => [c.id, c]))
+
+  // ── Needle-active item ──
+  const needleMs = needle.getTime()
+  let activeId: string | null = null
+  let closestDiff = Infinity
+  for (const ev of upcomingDesktop) {
+    const evMs = new Date(ev.date + 'T' + (ev.time ?? '00:00') + ':00').getTime()
+    const diff = Math.abs(evMs - needleMs)
+    if (diff < closestDiff) { closestDiff = diff; activeId = ev.id }
+  }
+
+  useEffect(() => {
+    if (!activeId || !rightPanelOpen) return
+    const el = rightItemRefs.current.get(activeId)
+    const list = rightListRef.current
+    if (el && list) {
+      const elRect = el.getBoundingClientRect()
+      const listRect = list.getBoundingClientRect()
+      const targetTop = list.scrollTop + elRect.top - listRect.top - (list.clientHeight - el.offsetHeight) / 2
+      list.scrollTo({ top: Math.max(0, targetTop), behavior: 'smooth' })
+    }
+  }, [activeId, rightPanelOpen])
 
   const toggleFilterCat = (id: string) =>
     setRightFilterCats(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
@@ -355,7 +379,7 @@ export default function AppLayout() {
             )}
 
             {/* List */}
-            <div className="flex-1 overflow-y-auto flex flex-col gap-0.5 px-2 py-2" dir={rtl ? 'rtl' : 'ltr'}>
+            <div ref={rightListRef} className="flex-1 overflow-y-auto flex flex-col gap-0.5 px-2 py-2" dir={rtl ? 'rtl' : 'ltr'}>
               {upcomingDesktop.length === 0 && (
                 <p className="text-sm text-gray-400 text-center py-8">{tr.noUpcomingEvents}</p>
               )}
@@ -364,12 +388,24 @@ export default function AppLayout() {
                 const isTask = ev.itemType === 'task'
                 const isPending = ev.rsvpStatus === 'pending'
                 const isEvToday = ev.date === today
+                const isActive = ev.id === activeId
                 const { text: timeText, hot } = timeRemainingRight(ev, mode, tr)
                 return (
                   <button
                     key={ev.id}
+                    ref={el => { if (el) rightItemRefs.current.set(ev.id, el); else rightItemRefs.current.delete(ev.id) }}
                     onClick={() => setDesktopSheetEvent(ev)}
-                    className="flex items-start gap-2 px-3 py-2 rounded-xl bg-gray-50 hover:bg-blue-50 border border-transparent hover:border-blue-100 text-right transition-all"
+                    className={`flex items-start gap-2 px-3 py-2 rounded-xl text-right transition-all ${
+                      isActive
+                        ? 'bg-blue-50 shadow-sm'
+                        : 'bg-gray-50 hover:bg-blue-50 border border-transparent hover:border-blue-100'
+                    }`}
+                    style={isActive ? {
+                      borderWidth: 2,
+                      borderStyle: 'solid',
+                      borderColor: cat?.color ?? '#3b82f6',
+                      borderLeftWidth: 4,
+                    } : undefined}
                   >
                     <div className="flex-shrink-0 flex flex-col items-center w-9 mt-0.5 gap-0.5">
                       <span className="text-[10px] font-mono text-gray-400 leading-none">

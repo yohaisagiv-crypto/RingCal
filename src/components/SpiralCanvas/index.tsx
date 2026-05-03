@@ -12,7 +12,7 @@ interface Props {
 
 export default function SpiralCanvas({ onTapEmpty, onTapEvent, eventsOverride }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
-  const { mode, needle, viewDate, events: storeEvents, categories, settings, setNeedle, spiralGeneration } = useAppStore()
+  const { mode, needle, viewDate, events: storeEvents, categories, settings, setNeedle } = useAppStore()
   const events = eventsOverride ?? storeEvents
   const { tr } = useLang()
   const year = viewDate.getFullYear()
@@ -21,22 +21,10 @@ export default function SpiralCanvas({ onTapEmpty, onTapEvent, eventsOverride }:
   // Drag state
   const isDragging = useRef(false)
   const dragStart = useRef<{ x: number; y: number } | null>(null)
-  const isDraggingNeedle = useRef(false)
 
-  // Pinch-to-zoom + pan state
-  const zoom = useRef(1)
-  const panOffset = useRef<{ x: number; y: number }>({ x: 0, y: 0 })
+  // Track all active pointers (to suppress needle rotation during multi-touch)
   const activePointers = useRef<Map<number, { x: number; y: number }>>(new Map())
-  const pinchStartDist = useRef<number | null>(null)
-  const pinchStartZoom = useRef(1)
-  const pinchStartPan = useRef<{ x: number; y: number }>({ x: 0, y: 0 })
-  const pinchStartMid = useRef<{ x: number; y: number }>({ x: 0, y: 0 })
   const wasPinching = useRef(false)
-
-  useEffect(() => {
-    zoom.current = 1
-    panOffset.current = { x: 0, y: 0 }
-  }, [mode, spiralGeneration])
 
   const draw = useCallback(() => {
     const now = new Date()
@@ -85,11 +73,7 @@ export default function SpiralCanvas({ onTapEmpty, onTapEvent, eventsOverride }:
     ctx.fillStyle = '#f8f8fc'
     ctx.fillRect(0, 0, W, H)
 
-    // ── Zoom + Pan ──
     ctx.save()
-    ctx.translate(CX + panOffset.current.x, CY + panOffset.current.y)
-    ctx.scale(zoom.current, zoom.current)
-    ctx.translate(-CX, -CY)
 
     // ── Glow ──
     const glow = ctx.createRadialGradient(CX, CY, R_OUT * 0.7, CX, CY, R_OUT * 1.1)
@@ -161,7 +145,7 @@ export default function SpiralCanvas({ onTapEmpty, onTapEvent, eventsOverride }:
     drawDateLabels(ctx, mode, T, CX, CY, R_CAT_OUT, R_OUT, S, year, month, tr.daysShort as unknown as string[], tr.months as unknown as string[])
 
     // ── Events ──
-    drawEvents(ctx, mode, events, visibleCats, ringRadii, CX, CY, S, year, month, zoom.current, viewDate)
+    drawEvents(ctx, mode, events, visibleCats, ringRadii, CX, CY, S, year, month, 1, viewDate)
 
     // ── Critical arc — only when now is within the viewed period ──
     const nowInPeriod = (() => {
@@ -218,14 +202,11 @@ export default function SpiralCanvas({ onTapEmpty, onTapEvent, eventsOverride }:
     if (!canvas) return null
     const rect = canvas.getBoundingClientRect()
     const scale = canvas.width / rect.width
-    // screen → canvas pixels
-    const cx = (clientX - rect.left) * scale
-    const cy = (clientY - rect.top) * scale
+    // screen → canvas pixel coordinates (no transform to undo)
+    const x = (clientX - rect.left) * scale
+    const y = (clientY - rect.top) * scale
     const CX = canvas.width / 2
     const CY = canvas.height / 2
-    // undo pan+zoom transform
-    const x = (cx - CX - panOffset.current.x) / zoom.current + CX
-    const y = (cy - CY - panOffset.current.y) / zoom.current + CY
     return { x, y, CX, CY, S: canvas.width / 570 }
   }, [])
 
@@ -246,66 +227,20 @@ export default function SpiralCanvas({ onTapEmpty, onTapEvent, eventsOverride }:
     if (activePointers.current.size === 1) {
       dragStart.current = { x: e.clientX, y: e.clientY }
       isDragging.current = false
-      // Detect if touch is near the needle (to allow needle drag even when zoomed)
-      isDraggingNeedle.current = false
-      if (zoom.current > 1) {
-        const frac = getAngleFromPointer(e.clientX, e.clientY)
-        if (frac !== null) {
-          const dim = daysInMonth(year, month)
-          const nMin = needle.getHours() * 60 + needle.getMinutes()
-          let needleFrac = 0
-          if (mode === 'day') needleFrac = nMin / 1440
-          else if (mode === 'week') needleFrac = (needle.getDay() + nMin / 1440) / 7
-          else if (mode === 'month') needleFrac = (needle.getDate() - 1 + nMin / 1440) / dim
-          else {
-            const jan1 = new Date(needle.getFullYear(), 0, 1).getTime()
-            needleFrac = (needle.getTime() - jan1) / (new Date(needle.getFullYear() + 1, 0, 1).getTime() - jan1)
-          }
-          const diff = Math.min(Math.abs(frac - needleFrac), 1 - Math.abs(frac - needleFrac))
-          if (diff < 0.05) isDraggingNeedle.current = true
-        }
-      }
-    } else if (activePointers.current.size === 2) {
-      // Start pinch
-      const pts = Array.from(activePointers.current.values())
-      const dx = pts[1].x - pts[0].x, dy = pts[1].y - pts[0].y
-      pinchStartDist.current = Math.sqrt(dx * dx + dy * dy)
-      pinchStartZoom.current = zoom.current
-      pinchStartPan.current = { ...panOffset.current }
-      pinchStartMid.current = { x: (pts[0].x + pts[1].x) / 2, y: (pts[0].y + pts[1].y) / 2 }
+    } else if (activePointers.current.size >= 2) {
+      // Multi-touch: cancel single-finger drag
       wasPinching.current = true
       isDragging.current = false
       dragStart.current = null
     }
     ;(e.currentTarget as HTMLCanvasElement).setPointerCapture(e.pointerId)
-  }, [year, month, needle, mode, getAngleFromPointer])
+  }, [])
 
   const onPointerMove = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
     activePointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
 
-    if (activePointers.current.size === 2 && pinchStartDist.current !== null) {
-      // Pinch-to-zoom + two-finger pan
-      const pts = Array.from(activePointers.current.values())
-      const dx = pts[1].x - pts[0].x, dy = pts[1].y - pts[0].y
-      const dist = Math.sqrt(dx * dx + dy * dy)
-      const newZoom = Math.min(4, Math.max(0.4, pinchStartZoom.current * (dist / pinchStartDist.current)))
-      zoom.current = newZoom
-
-      // Pan by midpoint shift
-      const mid = { x: (pts[0].x + pts[1].x) / 2, y: (pts[0].y + pts[1].y) / 2 }
-      const canvas = canvasRef.current
-      if (canvas) {
-        const scale = canvas.width / canvas.getBoundingClientRect().width
-        const maxPan = (canvas.width / 2) * (newZoom - 1)
-        panOffset.current = {
-          x: Math.max(-maxPan, Math.min(maxPan, pinchStartPan.current.x + (mid.x - pinchStartMid.current.x) * scale)),
-          y: Math.max(-maxPan, Math.min(maxPan, pinchStartPan.current.y + (mid.y - pinchStartMid.current.y) * scale)),
-        }
-      }
-      if (newZoom <= 1) panOffset.current = { x: 0, y: 0 }
-      draw()
-      return
-    }
+    // Multi-touch: do nothing (prevents erratic needle movement with 2+ fingers)
+    if (activePointers.current.size >= 2) return
 
     if (!dragStart.current) return
     const dx = e.clientX - dragStart.current.x
@@ -314,26 +249,11 @@ export default function SpiralCanvas({ onTapEmpty, onTapEvent, eventsOverride }:
       isDragging.current = true
     }
     if (isDragging.current) {
-      if (zoom.current > 1 && !isDraggingNeedle.current) {
-        // When zoomed in and not on needle: single finger pans
-        const canvas = canvasRef.current
-        if (canvas && dragStart.current) {
-          const scale = canvas.width / canvas.getBoundingClientRect().width
-          const maxPan = (canvas.width / 2) * (zoom.current - 1)
-          panOffset.current = {
-            x: Math.max(-maxPan, Math.min(maxPan, panOffset.current.x + (e.clientX - dragStart.current.x) * scale)),
-            y: Math.max(-maxPan, Math.min(maxPan, panOffset.current.y + (e.clientY - dragStart.current.y) * scale)),
-          }
-          dragStart.current = { x: e.clientX, y: e.clientY }
-          draw()
-        }
-      } else {
-        // Not zoomed or dragging needle: single finger rotates needle
-        const frac = getAngleFromPointer(e.clientX, e.clientY)
-        if (frac !== null) setNeedle(fracToDate(frac, mode, viewDate))
-      }
+      const frac = getAngleFromPointer(e.clientX, e.clientY)
+      if (frac !== null) setNeedle(fracToDate(frac, mode, viewDate))
+      dragStart.current = { x: e.clientX, y: e.clientY }
     }
-  }, [mode, viewDate, getAngleFromPointer, canvasToWorld, setNeedle, draw])
+  }, [mode, viewDate, getAngleFromPointer, setNeedle])
 
   const onPointerUp = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
     if (!isDragging.current && !wasPinching.current) {
@@ -378,7 +298,6 @@ export default function SpiralCanvas({ onTapEmpty, onTapEvent, eventsOverride }:
       }
     }
     activePointers.current.delete(e.pointerId)
-    if (activePointers.current.size < 2) pinchStartDist.current = null
     if (activePointers.current.size === 0) wasPinching.current = false
     isDragging.current = false
     dragStart.current = null
@@ -388,8 +307,6 @@ export default function SpiralCanvas({ onTapEmpty, onTapEvent, eventsOverride }:
     <div
       className="flex-1 overflow-hidden bg-[#f5f5f7]"
       style={{ position: 'relative' }}
-      onTouchStart={(e) => { if (zoom.current > 1 || e.touches.length >= 2) e.stopPropagation() }}
-      onTouchEnd={(e)   => { if (zoom.current > 1 || e.touches.length > 0 || e.changedTouches.length > 1) e.stopPropagation() }}
     >
       <canvas
         ref={canvasRef}

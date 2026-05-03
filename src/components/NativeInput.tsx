@@ -52,7 +52,7 @@ export function NativeInput({ value, onChange, ...props }: Props) {
       el.value = value
       try { el.setSelectionRange(s, e2) } catch { /* type may not support selection */ }
     }
-  })
+  }, [value])
 
   return <input ref={ref} defaultValue={value} autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false} {...props} />
 }
@@ -91,7 +91,7 @@ export function NativeTextarea({ value, onChange, ...props }: TAProps) {
   useEffect(() => {
     const el = ref.current
     if (el && document.activeElement !== el) el.value = value
-  })
+  }, [value])
 
   return <textarea ref={ref} defaultValue={value} {...props} />
 }

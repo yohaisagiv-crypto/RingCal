@@ -1,8 +1,10 @@
 import { useState } from 'react'
+import type React from 'react'
 import { useAppStore } from '../../store/useAppStore'
 import { useLang } from '../../hooks/useLang'
 import { LANGS } from '../../constants/langs'
 import EventSheet from '../EventSheet'
+import { GEMINI_SYSTEM_PROMPT } from '../../constants/geminiSystemPrompt'
 import type { CalendarEvent } from '../../types'
 
 interface Props {
@@ -16,9 +18,7 @@ const GEMINI_ATTEMPTS = [
   { v: 'v1beta', m: 'gemini-1.5-flash' },
 ]
 
-const APP_CONTEXT = `RingCal היא אפליקציית יומן ספירלי ייחודית. היומן מוצג כטבעות קונצנטריות עגולות. כל קטגוריה = טבעת. פריטים: אירועים (תאריך+שעה) ומטלות (תאריך יעד, ניתנות לסימון). קישורים בין פריטים, חזרתיות, RSVP, סנכרון Google Calendar.`
-
-async function callGemini(apiKey: string, prompt: string): Promise<string> {
+async function callGemini(apiKey: string, userPrompt: string): Promise<string> {
   let lastErr = ''
   for (const { v, m } of GEMINI_ATTEMPTS) {
     const res = await fetch(
@@ -26,7 +26,10 @@ async function callGemini(apiKey: string, prompt: string): Promise<string> {
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
+        body: JSON.stringify({
+          systemInstruction: { parts: [{ text: GEMINI_SYSTEM_PROMPT }] },
+          contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
+        }),
       }
     )
     if (res.status === 429 || res.status === 404) { lastErr = `${m} unavailable`; continue }
@@ -40,6 +43,26 @@ async function callGemini(apiKey: string, prompt: string): Promise<string> {
     return d.candidates?.[0]?.content?.parts?.[0]?.text ?? 'No answer'
   }
   throw new Error(lastErr || 'Connection error')
+}
+
+function renderTextWithLinks(text: string) {
+  const urlRegex = /(https?:\/\/[^\s]+|aistudio\.google\.com[^\s]*)/g
+  const result: (string | React.ReactElement)[] = []
+  let last = 0
+  let match: RegExpExecArray | null
+  while ((match = urlRegex.exec(text)) !== null) {
+    if (match.index > last) result.push(text.slice(last, match.index))
+    const url = match[0]
+    const href = url.startsWith('http') ? url : `https://${url}`
+    result.push(
+      <a key={match.index} href={href} target="_blank" rel="noreferrer"
+        className="text-blue-600 underline font-bold break-all"
+      >{url}</a>
+    )
+    last = match.index + url.length
+  }
+  if (last < text.length) result.push(text.slice(last))
+  return result
 }
 
 export default function MainMenuScreen({ onNavigate }: Props) {
@@ -70,15 +93,31 @@ export default function MainMenuScreen({ onNavigate }: Props) {
     const catMap = Object.fromEntries(categories.map(c => [c.id, c]))
     const today = new Date().toISOString().slice(0, 10)
     const tasks = events.filter(e => e.itemType === 'task' && !e.done)
-    const upcoming = events.filter(e => e.itemType !== 'task' && !e.done && e.date >= today).slice(0, 10)
-    const catLines = categories.map(c => `- ${c.icon} ${c.name}`).join('\n') || 'אין קטגוריות'
+    const upcoming = events.filter(e => e.itemType !== 'task' && !e.done && e.date >= today).slice(0, 15)
+    const overdue = events.filter(e => !e.done && e.date < today).slice(0, 10)
+    const catLines = categories.map(c => `- ${c.icon} ${c.name}`).join('\n') || 'No categories'
     const taskLines = tasks.map(t =>
-      `- ${t.title}${t.date ? ` (יעד: ${t.date})` : ''}${catMap[t.categoryId] ? ` [${catMap[t.categoryId].name}]` : ''}${t.note ? `: ${t.note}` : ''}`
-    ).join('\n') || 'אין מטלות פעילות'
+      `- [${t.priority ?? 'N'}] ${t.title}${t.date ? ` (due: ${t.date})` : ''}${catMap[t.categoryId] ? ` [${catMap[t.categoryId].name}]` : ''}${t.note ? ` — ${t.note}` : ''}`
+    ).join('\n') || 'No active tasks'
     const eventLines = upcoming.map(e =>
-      `- ${e.title} (${e.date}${e.time ? ' ' + e.time : ''})${catMap[e.categoryId] ? ` [${catMap[e.categoryId].name}]` : ''}`
-    ).join('\n') || 'אין אירועים קרובים'
-    return `${APP_CONTEXT}\n\nהיום: ${today}\n\nקטגוריות:\n${catLines}\n\nמטלות פעילות:\n${taskLines}\n\nאירועים קרובים:\n${eventLines}`
+      `- ${e.title} (${e.date}${e.time ? ' ' + e.time : ''})${catMap[e.categoryId] ? ` [${catMap[e.categoryId].name}]` : ''}${e.rsvpStatus === 'pending' ? ' [PENDING RSVP]' : ''}`
+    ).join('\n') || 'No upcoming events'
+    const overdueLines = overdue.length > 0
+      ? overdue.map(e => `- ${e.title} (was due: ${e.date})`).join('\n')
+      : 'None'
+    return `TODAY: ${today}
+
+CATEGORIES:
+${catLines}
+
+ACTIVE TASKS (priority: H=high N=normal L=low):
+${taskLines}
+
+UPCOMING EVENTS (next 15):
+${eventLines}
+
+OVERDUE ITEMS:
+${overdueLines}`
   }
 
   const askGemini = async () => {
@@ -205,7 +244,7 @@ export default function MainMenuScreen({ onNavigate }: Props) {
 
             {helpOpen && (
               <div className="px-3 pb-3 border-t border-gray-100 flex flex-col gap-1.5">
-                {(tr.help as { title: string; text: string }[]).map(s => {
+                {(tr.help as unknown as { title: string; text: string }[]).map(s => {
                   const parts = s.title.split(' ')
                   const icon = parts[0]
                   const titleText = parts.slice(1).join(' ')
@@ -224,7 +263,20 @@ export default function MainMenuScreen({ onNavigate }: Props) {
                       </button>
                       {isOpen && (
                         <div className="px-4 pb-4 pt-1 border-t border-gray-100">
-                          <p className="text-gray-600 text-sm leading-relaxed whitespace-pre-line">{s.text}</p>
+                          <p className="text-gray-600 text-sm leading-relaxed whitespace-pre-line">
+                            {renderTextWithLinks(s.text)}
+                          </p>
+                          {icon === '🤖' && (
+                            <a
+                              href="https://aistudio.google.com/app/apikey"
+                              target="_blank" rel="noreferrer"
+                              className="mt-3 w-full py-3 rounded-xl font-extrabold text-sm bg-blue-500 text-white text-center flex items-center justify-center gap-2"
+                            >
+                              <span>🔑</span>
+                              <span>{tr.aiOpenStudio}</span>
+                              <span>→</span>
+                            </a>
+                          )}
                         </div>
                       )}
                     </div>
@@ -246,14 +298,33 @@ export default function MainMenuScreen({ onNavigate }: Props) {
             </div>
 
             {!apiKey ? (
-              <div className="p-4 flex flex-col gap-3">
+              <div className="p-4 flex flex-col gap-4">
                 <p className="text-sm text-gray-600 leading-relaxed">{tr.aiConnectSub}</p>
-                <button
-                  onClick={() => window.open('https://aistudio.google.com/apikey', '_blank')}
-                  className="w-full py-3 rounded-xl font-extrabold text-sm bg-blue-500 text-white"
+
+                {/* Step-by-step guide */}
+                <div className="bg-blue-50 rounded-xl overflow-hidden">
+                  <div className="px-3 py-2 bg-blue-500">
+                    <p className="text-xs font-extrabold text-white">{tr.aiHowToGet}</p>
+                    <p className="text-[11px] text-blue-100">{tr.aiHowToSub}</p>
+                  </div>
+                  {(tr.aiSteps as unknown as { text: string; sub: string }[]).map((s, i) => (
+                    <div key={i} className="flex items-start gap-3 px-3 py-2.5 border-b border-blue-100 last:border-0">
+                      <span className="flex-shrink-0 w-6 h-6 rounded-full bg-blue-500 text-white text-xs font-black flex items-center justify-center mt-0.5">{i + 1}</span>
+                      <div>
+                        <p className="text-sm font-bold text-gray-800">{s.text}</p>
+                        <p className="text-[11px] text-gray-400">{s.sub}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <a
+                  href="https://aistudio.google.com/app/apikey"
+                  target="_blank" rel="noreferrer"
+                  className="w-full py-3 rounded-xl font-extrabold text-sm bg-blue-500 text-white text-center block"
                 >
-                  {tr.aiConnectBtn}
-                </button>
+                  {tr.aiOpenStudio}
+                </a>
                 <div className="flex gap-2">
                   <input
                     type="password"
@@ -270,7 +341,7 @@ export default function MainMenuScreen({ onNavigate }: Props) {
                       keyInput.trim() ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-400'
                     }`}
                   >
-                    {tr.save}
+                    {tr.aiSaveConnect}
                   </button>
                 </div>
               </div>
