@@ -136,7 +136,7 @@ export default function SpiralCanvas({ onTapEmpty, onTapEvent, eventsOverride }:
     ringLine(R_CAT_OUT, 'rgba(0,0,80,.6)', 2)
     ringLine(R_OUT, 'rgba(0,0,80,.6)', 2)
 
-    if (mode !== 'year') donut(R_CAT_OUT, R_OUT, 'rgba(220,228,248,.4)')
+    donut(R_CAT_OUT, R_OUT, 'rgba(220,228,248,.4)')
 
     // ── Weekend shading in outer ring ──
     drawWeekendShading(ctx, mode, T, CX, CY, R_CAT_OUT, R_OUT, year, month)
