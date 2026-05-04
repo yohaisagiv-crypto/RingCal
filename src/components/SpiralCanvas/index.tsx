@@ -142,7 +142,7 @@ export default function SpiralCanvas({ onTapEmpty, onTapEvent, eventsOverride }:
     drawWeekendShading(ctx, mode, T, CX, CY, R_CAT_OUT, R_OUT, year, month)
 
     // ── Date labels (outer ring) ──
-    drawDateLabels(ctx, mode, T, CX, CY, R_CAT_OUT, R_OUT, S, year, month, tr.daysShort as unknown as string[], tr.months as unknown as string[])
+    drawDateLabels(ctx, mode, T, CX, CY, R_CAT_OUT, R_OUT, S, year, month, tr.daysShort as unknown as string[], tr.monthsShort as unknown as string[])
 
     // ── Events ──
     drawEvents(ctx, mode, events, visibleCats, ringRadii, CX, CY, S, year, month, 1, viewDate)
@@ -489,7 +489,7 @@ function drawDateLabels(
       ctx.save()
       ctx.translate(p.x, p.y); ctx.rotate(a + Math.PI / 2)
       ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
-      ctx.font = `900 ${Math.max(10, Math.round(13 * S))}px 'Heebo'`
+      ctx.font = `900 ${Math.max(7, Math.round(9 * S))}px 'Heebo'`
       ctx.fillStyle = 'rgba(0,0,60,.9)'
       ctx.fillText(monthNames[m] ?? '', 0, 0)
       ctx.restore()

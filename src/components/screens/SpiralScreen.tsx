@@ -63,8 +63,10 @@ export default function SpiralScreen({ onNavigate, filterCats = [], filterType =
         const since = new Date(now - 30 * 86_400_000)
         const gcalEvents = await gcal.fetchFutureEvents(since)
         const existingIds = new Set(useAppStore.getState().events.map(e => e.gcalId).filter(Boolean))
+        const deletedSet = new Set(useAppStore.getState().deletedGcalIds)
         for (const ge of gcalEvents) {
           if (existingIds.has(ge.id)) continue
+          if (deletedSet.has(ge.id)) continue
           const imported = gcal.fromGcalEvent(ge)
           const cat = useAppStore.getState().categories[0]?.id ?? ''
           const newId = useAppStore.getState().addEvent({ ...imported, itemType: 'event', categoryId: cat, priority: 'N', done: false, links: [], files: [] })

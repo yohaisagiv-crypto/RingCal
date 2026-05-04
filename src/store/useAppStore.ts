@@ -126,6 +126,9 @@ interface AppState {
   setGcalConnected: (v: boolean) => void
   patchEventGcalId: (id: string, gcalId: string) => void
 
+  deletedGcalIds: string[]
+  markGcalIdDeleted: (gcalId: string) => void
+
   // Actions
   addEvent: (ev: Omit<CalendarEvent, 'id'>) => string
   addRecurringEvent: (ev: Omit<CalendarEvent, 'id'>) => void
@@ -170,6 +173,15 @@ export const useAppStore = create<AppState>()(
           events: s.events.map((e) => (e.id === id ? { ...e, gcalId } : e)),
         })),
 
+      deletedGcalIds: [],
+
+      markGcalIdDeleted: (gcalId) =>
+        set((s) => ({
+          deletedGcalIds: s.deletedGcalIds.includes(gcalId)
+            ? s.deletedGcalIds
+            : [...s.deletedGcalIds, gcalId],
+        })),
+
       addEvent: (ev) => {
         const id = crypto.randomUUID()
         set((s) => ({ events: applyRollup([...s.events, { ...ev, id }]) }))
@@ -195,7 +207,16 @@ export const useAppStore = create<AppState>()(
       },
 
       deleteEvent: (id) =>
-        set((s) => ({ events: applyRollup(s.events.filter((e) => e.id !== id)) })),
+        set((s) => {
+          const ev = s.events.find(e => e.id === id)
+          const gcalId = ev?.gcalId
+          return {
+            events: applyRollup(s.events.filter((e) => e.id !== id)),
+            deletedGcalIds: gcalId && !s.deletedGcalIds.includes(gcalId)
+              ? [...s.deletedGcalIds, gcalId]
+              : s.deletedGcalIds,
+          }
+        }),
 
       deleteEventCascade: (id) =>
         set((s) => ({ events: applyRollup(s.events.filter((e) => e.id !== id && e.recurrenceParentId !== id)) })),
@@ -269,6 +290,7 @@ export const useAppStore = create<AppState>()(
         categories: s.categories,
         settings: s.settings,
         gcalConnected: s.gcalConnected,
+        deletedGcalIds: s.deletedGcalIds,
       }),
       merge: (persisted, current) => {
         const p = persisted as Partial<typeof current>
@@ -276,6 +298,7 @@ export const useAppStore = create<AppState>()(
           ...current,
           ...p,
           mode: 'week',
+          deletedGcalIds: p.deletedGcalIds ?? [],
           // Migrate legacy events: make itemType explicit so filters are unambiguous
           events: (p.events ?? []).map(e => ({
             ...e,

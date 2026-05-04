@@ -40,23 +40,32 @@ interface EventRowProps {
   tr: ReturnType<typeof import('../../i18n/translations').getLang>
   onEdit: (ev: CalendarEvent) => void
   onDelete: (id: string) => void
+  selectMode: boolean
+  selected: boolean
+  onToggleSelect: (id: string) => void
 }
 
-function EventRow({ ev, categories, today, tr, onEdit, onDelete }: EventRowProps) {
+function EventRow({ ev, categories, today, tr, onEdit, onDelete, selectMode, selected, onToggleSelect }: EventRowProps) {
   const cat = categories.find(c => c.id === ev.categoryId)
   const isPast = ev.date < today || ev.done
   const isPending = ev.rsvpStatus === 'pending'
   const timeLeft = isPast ? null : timeRemaining(ev.date, ev.time, tr)
   return (
     <div
-      onClick={() => onEdit(ev)}
-      className={`flex items-center gap-2 px-3 py-2.5 bg-white rounded-xl shadow-sm border cursor-pointer active:scale-[.98] transition-transform ${isPast ? 'opacity-55' : ''}`}
+      onClick={() => selectMode ? onToggleSelect(ev.id) : onEdit(ev)}
+      className={`flex items-center gap-2 px-3 py-2.5 bg-white rounded-xl shadow-sm border cursor-pointer active:scale-[.98] transition-transform ${isPast ? 'opacity-55' : ''} ${selected ? 'ring-2 ring-blue-400' : ''}`}
       style={{ borderColor: (cat?.color ?? '#888') + '44', borderRightWidth: 3, borderRightColor: cat?.color }}
     >
-      <button
-        onClick={e => { e.stopPropagation(); onDelete(ev.id) }}
-        className="text-gray-300 text-lg font-black w-5 flex-shrink-0 hover:text-red-400"
-      >×</button>
+      {selectMode ? (
+        <span className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 text-xs font-black transition-colors ${selected ? 'bg-blue-500 border-blue-500 text-white' : 'border-gray-300 text-transparent'}`}>
+          ✓
+        </span>
+      ) : (
+        <button
+          onClick={e => { e.stopPropagation(); onDelete(ev.id) }}
+          className="text-gray-300 text-lg font-black w-5 flex-shrink-0 hover:text-red-400"
+        >×</button>
+      )}
       <span className="text-sm flex-shrink-0">{isPending ? '📬' : '📅'}</span>
       <div className="flex-1 min-w-0">
         <p className="text-sm font-bold text-gray-800 truncate">
@@ -104,6 +113,8 @@ export default function EventsScreen({ onBack }: { onBack: () => void }) {
   const [historyYear, setHistoryYear] = useState<number | null>(null)
   const [historyMonth, setHistoryMonth] = useState<number | null>(null)
   const [gcalOnly, setGcalOnly] = useState(false)
+  const [selectMode, setSelectMode] = useState(false)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const scrollRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => { setHistoryYear(null); setHistoryMonth(null); setGcalOnly(false) }, [filterCat])
@@ -139,6 +150,22 @@ export default function EventsScreen({ onBack }: { onBack: () => void }) {
     .sort((a, b) => (a.date + (a.time ?? '')) > (b.date + (b.time ?? '')) ? -1 : 1)
     .filter(e => !searchPastLower || e.title.toLowerCase().includes(searchPastLower) || (e.note ?? '').toLowerCase().includes(searchPastLower))
 
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  const exitSelectMode = () => { setSelectMode(false); setSelectedIds(new Set()) }
+
+  const deleteSelected = () => {
+    for (const id of selectedIds) handleDelete(id)
+    exitSelectMode()
+  }
+
   const loadHistoricalFromGcal = async () => {
     if (!gcalConnected || !gcal.isConnected()) return
     setGcalLoading(true)
@@ -160,30 +187,57 @@ export default function EventsScreen({ onBack }: { onBack: () => void }) {
     setGcalLoading(false)
   }
 
+  const rowProps = { categories, today, tr, onEdit: setEditEvent, onDelete: handleDelete, selectMode, onToggleSelect: toggleSelect }
+
   return (
     <div className="flex flex-col h-full bg-[#f5f5f7]">
       {/* Header */}
       <div className="flex-shrink-0 bg-white border-b border-gray-200 px-4 py-2 flex items-center gap-2">
-        <button onClick={onBack} className="bg-blue-500 text-white text-sm font-bold px-3 py-1.5 rounded-full flex-shrink-0">
-          ← {tr.backToBoard}
-        </button>
-        <span className="font-mono text-base font-black text-gray-800 flex-1 text-center">
-          📋 {tr.eventsList}
-          {pendingInvites.length > 0 && (
-            <span className="ml-1 text-xs bg-red-500 text-white rounded-full px-1.5 py-0.5 font-black">{pendingInvites.length}</span>
-          )}
-        </span>
-        {gcalConnected && !gcalLoadDone && (
-          <button
-            onClick={() => setShowGcalImport(true)}
-            className="w-8 h-8 rounded-lg bg-blue-50 text-blue-500 flex items-center justify-center text-base flex-shrink-0 border border-blue-200"
-            title={tr.loadGcalHistory}
-          >📥</button>
+        {selectMode ? (
+          <>
+            <button onClick={exitSelectMode} className="bg-gray-200 text-gray-600 text-sm font-bold px-3 py-1.5 rounded-full flex-shrink-0">
+              {tr.cancel}
+            </button>
+            <span className="flex-1 text-sm font-bold text-gray-600 text-center">
+              {selectedIds.size > 0 ? `${selectedIds.size} נבחרו` : 'בחר אירועים'}
+            </span>
+            <button
+              onClick={deleteSelected}
+              disabled={selectedIds.size === 0}
+              className={`text-sm font-extrabold px-3 py-1.5 rounded-full flex-shrink-0 transition-colors ${selectedIds.size > 0 ? 'bg-red-500 text-white' : 'bg-gray-100 text-gray-400'}`}
+            >
+              {tr.delete} {selectedIds.size > 0 ? `(${selectedIds.size})` : ''}
+            </button>
+          </>
+        ) : (
+          <>
+            <button onClick={onBack} className="bg-blue-500 text-white text-sm font-bold px-3 py-1.5 rounded-full flex-shrink-0">
+              ← {tr.backToBoard}
+            </button>
+            <span className="font-mono text-base font-black text-gray-800 flex-1 text-center">
+              📋 {tr.eventsList}
+              {pendingInvites.length > 0 && (
+                <span className="ml-1 text-xs bg-red-500 text-white rounded-full px-1.5 py-0.5 font-black">{pendingInvites.length}</span>
+              )}
+            </span>
+            <button
+              onClick={() => setSelectMode(true)}
+              className="w-8 h-8 rounded-lg bg-gray-100 text-gray-500 flex items-center justify-center text-sm flex-shrink-0 border border-gray-200"
+              title="בחר מספר אירועים"
+            >☑</button>
+            {gcalConnected && !gcalLoadDone && (
+              <button
+                onClick={() => setShowGcalImport(true)}
+                className="w-8 h-8 rounded-lg bg-blue-50 text-blue-500 flex items-center justify-center text-base flex-shrink-0 border border-blue-200"
+                title={tr.loadGcalHistory}
+              >📥</button>
+            )}
+            {gcalLoadDone && <span className="text-green-500 text-base flex-shrink-0">✅</span>}
+            <button onClick={() => setAddNew(true)} className="bg-blue-500 text-white text-xs font-bold px-3 py-1.5 rounded-full flex-shrink-0">
+              {tr.addShort}
+            </button>
+          </>
         )}
-        {gcalLoadDone && <span className="text-green-500 text-base flex-shrink-0">✅</span>}
-        <button onClick={() => setAddNew(true)} className="bg-blue-500 text-white text-xs font-bold px-3 py-1.5 rounded-full flex-shrink-0">
-          {tr.addShort}
-        </button>
       </div>
 
       {/* Category filter */}
@@ -215,7 +269,7 @@ export default function EventsScreen({ onBack }: { onBack: () => void }) {
               <span>📬</span> {tr.rsvpPending} ({pendingInvites.length})
             </p>
             {pendingInvites.map(ev => (
-              <EventRow key={ev.id} ev={ev} categories={categories} today={today} tr={tr} onEdit={setEditEvent} onDelete={handleDelete} />
+              <EventRow key={ev.id} ev={ev} selected={selectedIds.has(ev.id)} {...rowProps} />
             ))}
           </div>
         )}
@@ -234,7 +288,7 @@ export default function EventsScreen({ onBack }: { onBack: () => void }) {
           />
           {upcoming.length === 0
             ? <p className="text-sm text-gray-400 text-center py-3">{tr.noUpcomingEvents}</p>
-            : upcoming.map(ev => <EventRow key={ev.id} ev={ev} categories={categories} today={today} tr={tr} onEdit={setEditEvent} onDelete={handleDelete} />)
+            : upcoming.map(ev => <EventRow key={ev.id} ev={ev} selected={selectedIds.has(ev.id)} {...rowProps} />)
           }
         </div>
 
@@ -271,7 +325,6 @@ export default function EventsScreen({ onBack }: { onBack: () => void }) {
                 onYear={setHistoryYear} onMonth={setHistoryMonth}
                 allLabel={tr.all} monthsShort={tr.monthsShort}
               />
-              {/* Search */}
               <input
                 value={searchPast}
                 onChange={e => setSearchPast(e.target.value)}
@@ -281,7 +334,7 @@ export default function EventsScreen({ onBack }: { onBack: () => void }) {
               />
               {past.length === 0
                 ? <p className="text-sm text-gray-400 text-center py-3">{tr.noEvents}</p>
-                : past.map(ev => <EventRow key={ev.id} ev={ev} categories={categories} today={today} tr={tr} onEdit={setEditEvent} onDelete={handleDelete} />)
+                : past.map(ev => <EventRow key={ev.id} ev={ev} selected={selectedIds.has(ev.id)} {...rowProps} />)
               }
             </div>
           )}
