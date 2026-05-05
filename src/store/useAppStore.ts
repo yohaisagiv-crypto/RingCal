@@ -86,6 +86,7 @@ function generateInstances(master: CalendarEvent): CalendarEvent[] {
       const lastDay  = new Date(nextYear, originalMonth + 1, 0).getDate()
       cur.setFullYear(nextYear, originalMonth, Math.min(originalDay, lastDay))
     }
+    else break // unknown unit — stop to prevent infinite loop
     const curStr = localDateStr(cur)
     if (curStr > maxDateStr) break
     instances.push({ ...master, id: crypto.randomUUID(), date: curStr, recurrenceParentId: master.id, done: false })

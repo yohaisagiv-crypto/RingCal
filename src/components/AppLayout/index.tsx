@@ -128,11 +128,11 @@ export default function AppLayout() {
   }
 
   const tabs = [
-    { icon: '🔵', label: tr.tabCalendar },
-    { icon: '📋', label: tr.tabEvents },
-    { icon: '✅', label: tr.tabTasks },
-    { icon: '?',  label: tr.tabMenu },
-    { icon: '⚙️', label: tr.tabSettings },
+    { id: 'calendar', icon: '🔵', label: tr.tabCalendar },
+    { id: 'events',   icon: '📋', label: tr.tabEvents },
+    { id: 'tasks',    icon: '✅', label: tr.tabTasks },
+    { id: 'menu',     icon: '?',  label: tr.tabMenu },
+    { id: 'settings', icon: '⚙️', label: tr.tabSettings },
   ]
 
   // ── Desktop right panel data ──
@@ -440,7 +440,7 @@ export default function AppLayout() {
       <div className="flex-shrink-0 flex items-center gap-1 px-2 py-2 bg-white border-t-2 border-gray-200 relative z-[60] lg:hidden">
         {tabs.map((tab, i) => (
           <button
-            key={i}
+            key={tab.id}
             onClick={() => navigateTo(i)}
             className={`flex-1 flex flex-col items-center justify-center py-1.5 rounded-xl font-extrabold text-xs transition-all duration-200 relative ${
               page === i ? 'bg-blue-500 text-white shadow-md' : 'bg-gray-50 text-gray-500'

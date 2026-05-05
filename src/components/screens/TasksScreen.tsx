@@ -33,7 +33,7 @@ export default function TasksScreen({ onBack }: Props) {
 
   useEffect(() => {
     if (!categories.find(c => c.id === newCat)) setNewCat(categories[0]?.id ?? '')
-  }, [categories])
+  }, [categories, newCat])
 
   useEffect(() => { setCompletedYear(null); setCompletedMonth(null); setGcalOnlyCompleted(false) }, [filterCat])
 
