@@ -107,7 +107,7 @@ export default function SpiralCanvas({ onTapEmpty, onTapEvent, eventsOverride }:
 
     // ── Elapsed arc ──
     const df = elapsedFraction(mode, now, year, month)
-    if (df > 0 && mode !== 'year') {
+    if (df > 0) {
       const eA = -Math.PI / 2
       const eB = eA + df * Math.PI * 2
       visibleCats.forEach((cat, i) => {
@@ -137,6 +137,20 @@ export default function SpiralCanvas({ onTapEmpty, onTapEvent, eventsOverride }:
     ringLine(R_OUT, 'rgba(0,0,80,.6)', 2)
 
     donut(R_CAT_OUT, R_OUT, 'rgba(220,228,248,.4)')
+
+    // ── Elapsed arc in outer ring (all modes, matches inner rings) ──
+    if (df > 0) {
+      const eA = -Math.PI / 2
+      const eB = eA + df * Math.PI * 2
+      ctx.save()
+      ctx.beginPath()
+      ctx.arc(CX, CY, R_OUT, eA, eB)
+      ctx.arc(CX, CY, R_CAT_OUT, eB, eA, true)
+      ctx.closePath()
+      ctx.fillStyle = 'rgba(66,133,244,.22)'
+      ctx.fill()
+      ctx.restore()
+    }
 
     // ── Weekend shading in outer ring ──
     drawWeekendShading(ctx, mode, T, CX, CY, R_CAT_OUT, R_OUT, year, month)

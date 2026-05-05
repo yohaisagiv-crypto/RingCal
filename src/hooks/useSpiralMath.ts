@@ -56,7 +56,12 @@ export function buildRings(rIn: number, rOut: number, nRings: number, focusedRin
 
 /** Elapsed fraction of current period (0..1) */
 export function elapsedFraction(mode: string, now: Date, year: number, month: number): number {
-  if (mode === 'year') return 0
+  if (mode === 'year') {
+    if (now.getFullYear() !== year) return 0
+    const start = new Date(year, 0, 1).getTime()
+    const end   = new Date(year + 1, 0, 1).getTime()
+    return (now.getTime() - start) / (end - start)
+  }
   if (mode === 'month') {
     const dim = daysInMonth(year, month)
     const isCurrentMonth = now.getFullYear() === year && now.getMonth() === month

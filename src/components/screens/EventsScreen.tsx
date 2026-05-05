@@ -39,33 +39,25 @@ interface EventRowProps {
   today: string
   tr: ReturnType<typeof import('../../i18n/translations').getLang>
   onEdit: (ev: CalendarEvent) => void
-  onDelete: (id: string) => void
-  selectMode: boolean
   selected: boolean
   onToggleSelect: (id: string) => void
 }
 
-function EventRow({ ev, categories, today, tr, onEdit, onDelete, selectMode, selected, onToggleSelect }: EventRowProps) {
+function EventRow({ ev, categories, today, tr, onEdit, selected, onToggleSelect }: EventRowProps) {
   const cat = categories.find(c => c.id === ev.categoryId)
   const isPast = ev.date < today || ev.done
   const isPending = ev.rsvpStatus === 'pending'
   const timeLeft = isPast ? null : timeRemaining(ev.date, ev.time, tr)
   return (
     <div
-      onClick={() => selectMode ? onToggleSelect(ev.id) : onEdit(ev)}
+      onClick={() => onEdit(ev)}
       className={`flex items-center gap-2 px-3 py-2.5 bg-white rounded-xl shadow-sm border cursor-pointer active:scale-[.98] transition-transform ${isPast ? 'opacity-55' : ''} ${selected ? 'ring-2 ring-blue-400' : ''}`}
       style={{ borderColor: (cat?.color ?? '#888') + '44', borderRightWidth: 3, borderRightColor: cat?.color }}
     >
-      {selectMode ? (
-        <span className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 text-xs font-black transition-colors ${selected ? 'bg-blue-500 border-blue-500 text-white' : 'border-gray-300 text-transparent'}`}>
-          ✓
-        </span>
-      ) : (
-        <button
-          onClick={e => { e.stopPropagation(); onDelete(ev.id) }}
-          className="text-gray-300 text-lg font-black w-5 flex-shrink-0 hover:text-red-400"
-        >×</button>
-      )}
+      <span
+        onClick={e => { e.stopPropagation(); onToggleSelect(ev.id) }}
+        className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 text-xs font-black transition-colors cursor-pointer ${selected ? 'bg-blue-500 border-blue-500 text-white' : 'border-gray-300 text-transparent hover:border-blue-300'}`}
+      >✓</span>
       <span className="text-sm flex-shrink-0">{isPending ? '📬' : '📅'}</span>
       <div className="flex-1 min-w-0">
         <p className="text-sm font-bold text-gray-800 truncate">
@@ -113,7 +105,6 @@ export default function EventsScreen({ onBack }: { onBack: () => void }) {
   const [historyYear, setHistoryYear] = useState<number | null>(null)
   const [historyMonth, setHistoryMonth] = useState<number | null>(null)
   const [gcalOnly, setGcalOnly] = useState(false)
-  const [selectMode, setSelectMode] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const scrollRef = useRef<HTMLDivElement>(null)
 
@@ -159,11 +150,9 @@ export default function EventsScreen({ onBack }: { onBack: () => void }) {
     })
   }
 
-  const exitSelectMode = () => { setSelectMode(false); setSelectedIds(new Set()) }
-
   const deleteSelected = () => {
     for (const id of selectedIds) handleDelete(id)
-    exitSelectMode()
+    setSelectedIds(new Set())
   }
 
   const loadHistoricalFromGcal = async () => {
@@ -187,48 +176,40 @@ export default function EventsScreen({ onBack }: { onBack: () => void }) {
     setGcalLoading(false)
   }
 
-  const rowProps = { categories, today, tr, onEdit: setEditEvent, onDelete: handleDelete, selectMode, onToggleSelect: toggleSelect }
+  const rowProps = { categories, today, tr, onEdit: setEditEvent, onToggleSelect: toggleSelect }
 
   return (
     <div className="flex flex-col h-full bg-[#f5f5f7]">
       {/* Header */}
       <div className="flex-shrink-0 bg-white border-b border-gray-200 px-4 py-2 flex items-center gap-2">
-        {selectMode ? (
+        <button onClick={onBack} className="bg-blue-500 text-white text-sm font-bold px-3 py-1.5 rounded-full flex-shrink-0">
+          ← {tr.backToBoard}
+        </button>
+        <span className="font-mono text-base font-black text-gray-800 flex-1 text-center">
+          📋 {tr.eventsList}
+          {pendingInvites.length > 0 && (
+            <span className="ml-1 text-xs bg-red-500 text-white rounded-full px-1.5 py-0.5 font-black">{pendingInvites.length}</span>
+          )}
+        </span>
+        {selectedIds.size > 0 && (
           <>
-            <button onClick={exitSelectMode} className="bg-gray-200 text-gray-600 text-sm font-bold px-3 py-1.5 rounded-full flex-shrink-0">
+            <button onClick={() => setSelectedIds(new Set())} className="text-xs font-bold px-2 py-1.5 rounded-full bg-gray-100 text-gray-500 flex-shrink-0">
               {tr.cancel}
             </button>
-            <span className="flex-1 text-sm font-bold text-gray-600 text-center">
-              {selectedIds.size > 0 ? `${selectedIds.size} נבחרו` : 'בחר אירועים'}
-            </span>
             <button
               onClick={deleteSelected}
-              disabled={selectedIds.size === 0}
-              className={`text-sm font-extrabold px-3 py-1.5 rounded-full flex-shrink-0 transition-colors ${selectedIds.size > 0 ? 'bg-red-500 text-white' : 'bg-gray-100 text-gray-400'}`}
+              className="bg-red-500 text-white text-sm font-extrabold px-3 py-1.5 rounded-full flex-shrink-0"
             >
-              {tr.delete} {selectedIds.size > 0 ? `(${selectedIds.size})` : ''}
+              {tr.delete} ({selectedIds.size})
             </button>
           </>
-        ) : (
+        )}
+        {selectedIds.size === 0 && (
           <>
-            <button onClick={onBack} className="bg-blue-500 text-white text-sm font-bold px-3 py-1.5 rounded-full flex-shrink-0">
-              ← {tr.backToBoard}
-            </button>
-            <span className="font-mono text-base font-black text-gray-800 flex-1 text-center">
-              📋 {tr.eventsList}
-              {pendingInvites.length > 0 && (
-                <span className="ml-1 text-xs bg-red-500 text-white rounded-full px-1.5 py-0.5 font-black">{pendingInvites.length}</span>
-              )}
-            </span>
-            <button
-              onClick={() => setSelectMode(true)}
-              className="w-8 h-8 rounded-lg bg-gray-100 text-gray-500 flex items-center justify-center text-sm flex-shrink-0 border border-gray-200"
-              title="בחר מספר אירועים"
-            >☑</button>
-            {gcalConnected && !gcalLoadDone && (
+            {!gcalLoadDone && (
               <button
                 onClick={() => setShowGcalImport(true)}
-                className="w-8 h-8 rounded-lg bg-blue-50 text-blue-500 flex items-center justify-center text-base flex-shrink-0 border border-blue-200"
+                className={`w-8 h-8 rounded-lg flex items-center justify-center text-base flex-shrink-0 border ${gcalConnected ? 'bg-blue-50 text-blue-500 border-blue-200' : 'bg-gray-50 text-gray-400 border-gray-200'}`}
                 title={tr.loadGcalHistory}
               >📥</button>
             )}
@@ -348,6 +329,11 @@ export default function EventsScreen({ onBack }: { onBack: () => void }) {
           <div className="absolute bottom-0 left-0 right-0 bg-white rounded-t-2xl z-50 px-4 pb-8 pt-3 shadow-2xl" dir={rtl ? 'rtl' : 'ltr'}>
             <div className="w-10 h-1 rounded-full bg-gray-200 mx-auto mb-4" />
             <p className="font-extrabold text-base text-gray-800 mb-4">📥 {tr.loadGcalHistory}</p>
+            {!gcalConnected && (
+              <div className="mb-4 px-3 py-2.5 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-700 font-bold">
+                ⚠️ {tr.gcalNotConnected} — {tr.goToSettings}
+              </div>
+            )}
             <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-2">{tr.gcalHistoryRange}</p>
             <div className="flex flex-wrap gap-1.5 mb-3">
               {([1, 3, 10, 20] as const).map(y => (
