@@ -109,6 +109,7 @@ export default function EventSheet({ event, defaultDate, defaultItemType = 'even
   const [dependsType, setDependsType] = useState<'FS' | 'SS' | 'FF' | 'SF'>(event?.dependsType ?? 'FS')
   const [lag, setLag] = useState(event?.lag ?? 0)
   const [lagForce, setLagForce] = useState(event?.lagForce ?? false)
+  const [reminder, setReminder] = useState<number | undefined>(event?.reminder)
   const [titleError, setTitleError] = useState(false)
   const [endDateError, setEndDateError] = useState(false)
   const [rsvpCatPicker, setRsvpCatPicker] = useState(false)
@@ -133,6 +134,7 @@ export default function EventSheet({ event, defaultDate, defaultItemType = 'even
       files: isEdit ? (event!.files ?? []) : [],
       ...(showDep && dependsOn ? { dependsOn, dependsType, lag, lagForce } : {}),
       recurrence,
+      ...(reminder !== undefined ? { reminder } : {}),
     }
     const cat = categories.find(c => c.id === categoryId)
     const shouldSync = gcalConnected && gcal.isConnected() && (cat?.syncToGcal ?? true)
@@ -428,6 +430,26 @@ export default function EventSheet({ event, defaultDate, defaultItemType = 'even
                 priority === p.v ? 'bg-blue-500 text-white border-blue-500' : 'bg-gray-50 border-gray-200 text-gray-500'
               }`}>
               {p.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Reminder */}
+        <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">🔔 {tr.notificationsEnabled}</p>
+        <div className="flex flex-wrap gap-1.5 mb-3">
+          {([
+            { label: '—', val: undefined },
+            { label: '10′', val: 10 },
+            { label: '30′', val: 30 },
+            { label: '1h', val: 60 },
+            { label: '2h', val: 120 },
+            { label: '1d', val: 1440 },
+          ] as const).map(opt => (
+            <button key={String(opt.val)} onClick={() => setReminder(opt.val)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${
+                reminder === opt.val ? 'bg-blue-500 text-white border-blue-500' : 'bg-gray-50 border-gray-200 text-gray-500'
+              }`}>
+              {opt.label}
             </button>
           ))}
         </div>

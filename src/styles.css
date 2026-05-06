@@ -262,3 +262,39 @@ a {
     transform: translateY(0);
   }
 }
+
+/* ── Dark mode: smooth transition ── */
+* {
+  transition-property: background-color, border-color, color;
+  transition-duration: 200ms;
+  transition-timing-function: ease;
+}
+/* Exclude elements that have their own transitions */
+button, a, .island-shell { transition-duration: 180ms; }
+
+/* ── Dark mode: global Tailwind class overrides ── */
+html.dark .bg-white          { background-color: #1e293b; }
+html.dark .bg-gray-50        { background-color: #1e293b; }
+html.dark .bg-gray-100       { background-color: #334155; }
+html.dark .bg-gray-200       { background-color: #475569; }
+html.dark [class*="f5f5f7"]  { background-color: #0f172a; }
+
+html.dark .text-gray-800     { color: #f1f5f9; }
+html.dark .text-gray-700     { color: #e2e8f0; }
+html.dark .text-gray-600     { color: #cbd5e1; }
+html.dark .text-gray-500     { color: #94a3b8; }
+html.dark .text-gray-400     { color: #64748b; }
+html.dark .text-gray-300     { color: #475569; }
+
+html.dark .border-gray-50    { border-color: #334155; }
+html.dark .border-gray-100   { border-color: #334155; }
+html.dark .border-gray-200   { border-color: #475569; }
+html.dark .border-gray-300   { border-color: #64748b; }
+
+html.dark input:not([class*="bg-blue"]):not([class*="bg-green"]):not([class*="bg-red"]) { background-color: #1e293b; color: #f1f5f9; border-color: #475569; }
+html.dark textarea { background-color: #1e293b; color: #f1f5f9; border-color: #475569; }
+html.dark select  { background-color: #1e293b; color: #f1f5f9; border-color: #475569; }
+
+html.dark .shadow-sm  { box-shadow: 0 1px 3px rgba(0,0,0,0.4); }
+html.dark .shadow-md  { box-shadow: 0 4px 8px rgba(0,0,0,0.5); }
+html.dark .shadow-2xl { box-shadow: 0 25px 50px rgba(0,0,0,0.7); }

@@ -24,7 +24,8 @@ export default function SpiralScreen({ onNavigate, filterCats = [], filterType =
   const [showFabMenu, setShowFabMenu] = useState(false)
   const [showSearch, setShowSearch] = useState(false)
   const [filterCat, setFilterCat] = useState<string | null>(null)
-  const { events, gcalConnected, needle, spiralGeneration, soloCategory } = useAppStore()
+  const [syncingGcal, setSyncingGcal] = useState(false)
+  const { events, gcalConnected, needle, spiralGeneration, soloCategory, addEvent, patchEventGcalId } = useAppStore()
   const filteredEventsOverride = (filterCats.length > 0 || filterType !== 'all' || filterCat)
     ? events
         .filter(e => filterCats.length === 0 || filterCats.includes(e.categoryId))
@@ -33,6 +34,27 @@ export default function SpiralScreen({ onNavigate, filterCats = [], filterType =
     : undefined
   const { tr } = useLang()
   const pendingCount = events.filter(e => e.rsvpStatus === 'pending').length
+  const today = new Date().toISOString().slice(0, 10)
+  const overdueCount = events.filter(e => !e.done && e.date < today && e.itemType !== 'task').length
+
+  const manualSyncGcal = async () => {
+    if (!gcalConnected || !gcal.isConnected() || syncingGcal) return
+    setSyncingGcal(true)
+    try {
+      const since = new Date(Date.now() - 30 * 86_400_000)
+      const gcalEvents = await gcal.fetchFutureEvents(since)
+      const existingIds = new Set(useAppStore.getState().events.map(e => e.gcalId).filter(Boolean))
+      const deletedSet = new Set(useAppStore.getState().deletedGcalIds)
+      for (const ge of gcalEvents) {
+        if (existingIds.has(ge.id) || deletedSet.has(ge.id)) continue
+        const imported = gcal.fromGcalEvent(ge)
+        const cat = useAppStore.getState().categories[0]?.id ?? ''
+        const newId = addEvent({ ...imported, itemType: 'event', categoryId: cat, priority: 'N', done: false, links: [], files: [] })
+        patchEventGcalId(newId, ge.id)
+      }
+    } catch { /* silent */ }
+    setSyncingGcal(false)
+  }
 
   const closeSheet = () => { setSheetEvent(null); setAddDate(null) }
 
@@ -94,6 +116,16 @@ export default function SpiralScreen({ onNavigate, filterCats = [], filterType =
           <span className="text-white/70 text-base">›</span>
         </button>
       )}
+      {overdueCount > 0 && pendingCount === 0 && (
+        <button
+          onClick={() => onNavigate(1)}
+          className="flex-shrink-0 flex items-center gap-2 px-3 py-2 bg-red-500 text-white text-xs font-bold active:bg-red-600 transition-colors"
+        >
+          <span className="text-base">⚠️</span>
+          <span className="flex-1 text-right">{overdueCount} {tr.statsOverdue}</span>
+          <span className="text-white/70 text-base">›</span>
+        </button>
+      )}
       <CategoryStrip onParams={() => onNavigate(5)} filterCat={filterCat} onFilter={handleFilterCat} />
       <div className="lg:hidden">
         <UpcomingStrip onTap={(ev) => { setSheetEvent(ev); setAddDate(null) }} eventsOverride={filteredEventsOverride} />
@@ -109,6 +141,15 @@ export default function SpiralScreen({ onNavigate, filterCats = [], filterType =
         <>
           <div className="absolute inset-0 z-30" onClick={() => setShowFabMenu(false)} />
           <div className="absolute bottom-20 left-4 flex flex-col gap-2 z-40">
+            {gcalConnected && (
+              <button
+                onClick={() => { setShowFabMenu(false); manualSyncGcal() }}
+                className="flex items-center gap-2 px-4 py-2.5 bg-white rounded-full shadow-lg text-sm font-extrabold text-gray-700 border border-gray-200"
+              >
+                <span className={`w-7 h-7 rounded-full bg-teal-500 text-white flex items-center justify-center text-base font-black ${syncingGcal ? 'animate-spin' : ''}`}>🔄</span>
+                {tr.gcalSync}
+              </button>
+            )}
             <button
               onClick={() => { setShowFabMenu(false); setAddType('task'); setAddDate(needle); setSheetEvent(null) }}
               className="flex items-center gap-2 px-4 py-2.5 bg-white rounded-full shadow-lg text-sm font-extrabold text-gray-700 border border-gray-200"

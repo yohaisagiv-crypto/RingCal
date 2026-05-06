@@ -118,6 +118,11 @@ export default function EventsScreen({ onBack }: { onBack: () => void }) {
   const searchLower = search.toLowerCase()
   const searchPastLower = searchPast.toLowerCase()
 
+  const overdue = filtered
+    .filter(e => e.date < today && !e.done && e.itemType !== 'task')
+    .filter(e => !searchLower || e.title.toLowerCase().includes(searchLower) || (e.note ?? '').toLowerCase().includes(searchLower))
+    .sort((a, b) => (a.date + (a.time ?? '')) > (b.date + (b.time ?? '')) ? -1 : 1)
+
   const upcomingAll = filtered
     .filter(e => e.date >= today && !e.done)
     .sort((a, b) => (a.date + (a.time ?? '')) < (b.date + (b.time ?? '')) ? -1 : 1)
@@ -254,6 +259,16 @@ export default function EventsScreen({ onBack }: { onBack: () => void }) {
             {pendingInvites.map(ev => (
               <EventRow key={ev.id} ev={ev} selected={selectedIds.has(ev.id)} {...rowProps} />
             ))}
+          </div>
+        )}
+
+        {/* Overdue — not done but date passed */}
+        {overdue.length > 0 && (
+          <div className="flex flex-col gap-2">
+            <p className="text-xs font-extrabold text-red-500 uppercase tracking-wide flex items-center gap-1">
+              <span>⚠️</span> {tr.statsOverdue} ({overdue.length})
+            </p>
+            {overdue.map(ev => <EventRow key={ev.id} ev={ev} selected={selectedIds.has(ev.id)} {...rowProps} />)}
           </div>
         )}
 

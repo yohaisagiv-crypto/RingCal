@@ -103,6 +103,8 @@ export async function rescheduleAll(
   const today = new Date(); today.setHours(0, 0, 0, 0)
   const upcoming = events.filter(e => !e.done && new Date(e.date + 'T00:00:00') >= today)
   for (const ev of upcoming) {
-    await scheduleEventNotifications(ev, minutesBefore)
+    // Use per-event reminder if set, otherwise fall back to global schedule
+    const mins = ev.reminder !== undefined ? [ev.reminder] : minutesBefore
+    await scheduleEventNotifications(ev, mins)
   }
 }

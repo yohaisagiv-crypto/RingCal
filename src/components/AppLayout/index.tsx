@@ -68,6 +68,9 @@ export default function AppLayout() {
   } = useAppStore()
   const { tr, rtl } = useLang()
   const pendingCount = events.filter(e => e.rsvpStatus === 'pending').length
+  const today2 = new Date().toISOString().slice(0, 10)
+  const overdueCount = events.filter(e => !e.done && e.date < today2 && e.itemType !== 'task').length
+  const eventsAlertCount = pendingCount + overdueCount
   const pushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const autoSyncRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
@@ -220,7 +223,7 @@ export default function AppLayout() {
       {/* ═══════════════════════════════════════
           Desktop Sidebar
       ═══════════════════════════════════════ */}
-      <aside className="hidden lg:flex flex-col w-56 bg-white border-r border-gray-200 flex-shrink-0 z-10">
+      <aside className="hidden lg:flex flex-col w-56 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-700 flex-shrink-0 z-10">
         {/* Logo */}
         <div className="px-5 py-4 border-b border-gray-100 flex items-center gap-2">
           <span className="text-2xl">🔵</span>
@@ -239,9 +242,9 @@ export default function AppLayout() {
             >
               <span className="text-xl leading-none relative">
                 {tab.icon}
-                {i === 1 && pendingCount > 0 && (
+                {i === 1 && eventsAlertCount > 0 && (
                   <span className="absolute -top-1 -right-1 min-w-[14px] h-[14px] rounded-full bg-red-500 text-white text-[9px] font-black flex items-center justify-center px-0.5 leading-none">
-                    {pendingCount}
+                    {eventsAlertCount}
                   </span>
                 )}
               </span>
@@ -334,7 +337,7 @@ export default function AppLayout() {
 
         {/* Desktop Right Panel */}
         {rightPanelOpen && (
-          <aside className="hidden lg:flex flex-col w-80 bg-white border-l border-gray-200 flex-shrink-0 overflow-hidden">
+          <aside className="hidden lg:flex flex-col w-80 bg-white dark:bg-gray-900 border-l border-gray-200 dark:border-gray-700 flex-shrink-0 overflow-hidden">
             {/* Header with collapse button */}
             <div className="px-3 py-2 border-b border-gray-100 flex-shrink-0">
               <div className="flex items-center gap-2 mb-1.5">
@@ -482,7 +485,7 @@ export default function AppLayout() {
       {/* ═══════════════════════════════════════
           Mobile Tab Bar
       ═══════════════════════════════════════ */}
-      <div className="flex-shrink-0 flex items-center gap-1 px-2 py-2 bg-white border-t-2 border-gray-200 relative z-[60] lg:hidden">
+      <div className="flex-shrink-0 flex items-center gap-1 px-2 py-2 bg-white dark:bg-gray-900 border-t-2 border-gray-200 dark:border-gray-700 relative z-[60] lg:hidden">
         {tabs.map((tab, i) => (
           <button
             key={tab.id}
@@ -493,9 +496,9 @@ export default function AppLayout() {
           >
             <span className="text-lg leading-none mb-0.5 relative">
               {tab.icon}
-              {i === 1 && pendingCount > 0 && (
+              {i === 1 && eventsAlertCount > 0 && (
                 <span className="absolute -top-1 -right-1 min-w-[14px] h-[14px] rounded-full bg-red-500 text-white text-[9px] font-black flex items-center justify-center px-0.5 leading-none">
-                  {pendingCount}
+                  {eventsAlertCount}
                 </span>
               )}
             </span>
