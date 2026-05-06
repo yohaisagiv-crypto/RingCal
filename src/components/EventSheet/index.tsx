@@ -41,12 +41,23 @@ function shareIcs({ title, date, time, endTime, note, location, id }: {
     'END:VEVENT', 'END:VCALENDAR',
   ].filter(Boolean).join('\r\n')
 
+  const textBody = [
+    `📅 ${title}`,
+    `🗓 ${date}${time ? ' ' + time : ''}${endTime ? ' – ' + endTime : ''}`,
+    location ? `📍 ${location}` : '',
+    note ? `📝 ${note}` : '',
+  ].filter(Boolean).join('\n')
+
   const blob = new Blob([ics], { type: 'text/calendar' })
   const file = new File([blob], `${title}.ics`, { type: 'text/calendar' })
 
   if (navigator.canShare?.({ files: [file] })) {
-    navigator.share({ files: [file], title })
+    navigator.share({ files: [file], title, text: textBody }).catch(() => {})
+  } else if (navigator.share) {
+    // Android WebView / fallback: share as text
+    navigator.share({ title, text: textBody }).catch(() => {})
   } else {
+    // Desktop fallback: download .ics
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url; a.download = `${title}.ics`
@@ -838,22 +849,20 @@ export default function EventSheet({ event, defaultDate, defaultItemType = 'even
 
         {/* Share / invite */}
         {isEdit && (
-          <button
-            onClick={() => shareIcs({ title, date, time, endTime, note, location, id: event!.id })}
-            className="w-full mb-2 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold text-gray-600 flex items-center justify-center gap-2"
-          >
-            {tr.shareBtn}
-          </button>
-        )}
-
-        {/* Email share — for tasks */}
-        {isEdit && isTask && (
-          <a
-            href={`mailto:?subject=${encodeURIComponent(title)}&body=${encodeURIComponent(`${title}\n${date}${time ? ' ' + time : ''}${note ? '\n\n' + note : ''}`)}`}
-            className="w-full mb-2 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold text-gray-600 flex items-center justify-center gap-2"
-          >
-            {tr.emailShareBtn}
-          </a>
+          <div className="flex gap-2 mb-2">
+            <button
+              onClick={() => shareIcs({ title, date, time, endTime, note, location, id: event!.id })}
+              className="flex-1 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold text-gray-600 flex items-center justify-center gap-2"
+            >
+              {tr.shareBtn}
+            </button>
+            <a
+              href={`mailto:?subject=${encodeURIComponent(title)}&body=${encodeURIComponent(`📅 ${title}\n🗓 ${date}${time ? ' ' + time : ''}${endTime ? ' – ' + endTime : ''}${location ? '\n📍 ' + location : ''}${note ? '\n📝 ' + note : ''}`)}`}
+              className="flex-1 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold text-gray-600 flex items-center justify-center gap-2"
+            >
+              {tr.emailShareBtn}
+            </a>
+          </div>
         )}
 
         {/* Actions */}

@@ -80,7 +80,7 @@ function EventRow({ ev, categories, today, tr, onEdit, selected, onToggleSelect 
 }
 
 export default function EventsScreen({ onBack }: { onBack: () => void }) {
-  const { events, categories, deleteEvent, gcalConnected, addEvent, patchEventGcalId } = useAppStore()
+  const { events, categories, deleteEvent, gcalConnected, addEvent, patchEventGcalId, deletedGcalIds } = useAppStore()
   const { tr, rtl } = useLang()
 
   const handleDelete = (id: string) => {
@@ -163,10 +163,12 @@ export default function EventsScreen({ onBack }: { onBack: () => void }) {
         ? new Date(gcalCustomFrom + 'T00:00:00')
         : new Date(new Date().getFullYear() - gcalYears, 0, 1)
       const gcalEvents = await gcal.fetchFutureEvents(since)
-      const existingIds = new Set(useAppStore.getState().events.map(e => e.gcalId).filter(Boolean))
-      const cat0 = useAppStore.getState().categories[0]?.id ?? ''
+      const state = useAppStore.getState()
+      const existingIds = new Set(state.events.map(e => e.gcalId).filter(Boolean))
+      const deletedIds = new Set(state.deletedGcalIds)
+      const cat0 = state.categories[0]?.id ?? ''
       for (const ge of gcalEvents) {
-        if (existingIds.has(ge.id)) continue
+        if (existingIds.has(ge.id) || deletedIds.has(ge.id)) continue
         const imported = gcal.fromGcalEvent(ge)
         const newId = addEvent({ ...imported, itemType: 'event', categoryId: cat0, priority: 'N', done: false, links: [], files: [] })
         patchEventGcalId(newId, ge.id)
@@ -206,14 +208,14 @@ export default function EventsScreen({ onBack }: { onBack: () => void }) {
         )}
         {selectedIds.size === 0 && (
           <>
-            {!gcalLoadDone && (
-              <button
-                onClick={() => setShowGcalImport(true)}
-                className={`w-8 h-8 rounded-lg flex items-center justify-center text-base flex-shrink-0 border ${gcalConnected ? 'bg-blue-50 text-blue-500 border-blue-200' : 'bg-gray-50 text-gray-400 border-gray-200'}`}
-                title={tr.loadGcalHistory}
-              >📥</button>
-            )}
-            {gcalLoadDone && <span className="text-green-500 text-base flex-shrink-0">✅</span>}
+            <button
+              onClick={() => setShowGcalImport(true)}
+              className={`w-8 h-8 rounded-lg flex items-center justify-center text-base flex-shrink-0 border relative ${gcalConnected ? 'bg-blue-50 text-blue-500 border-blue-200' : 'bg-gray-50 text-gray-400 border-gray-200'}`}
+              title={tr.loadGcalHistory}
+            >
+              📥
+              {gcalLoadDone && <span className="absolute -top-1 -right-1 text-[9px] text-green-500 font-black leading-none">✓</span>}
+            </button>
             <button onClick={() => setAddNew(true)} className="bg-blue-500 text-white text-xs font-bold px-3 py-1.5 rounded-full flex-shrink-0">
               {tr.addShort}
             </button>
@@ -300,7 +302,7 @@ export default function EventsScreen({ onBack }: { onBack: () => void }) {
             <span className="text-gray-400">{showPast ? '▲' : '▼'}</span>
           </button>
           {showPast && (
-            <div className="bg-[#f5f5f7] px-2 pb-2 pt-2 flex flex-col gap-1.5">
+            <div className="bg-[#f5f5f7] px-2 pb-2 pt-2 flex flex-col gap-1.5 max-h-[65vh] overflow-y-auto">
               <YearMonthFilter
                 year={historyYear} month={historyMonth} years={pastYears}
                 onYear={setHistoryYear} onMonth={setHistoryMonth}
@@ -317,6 +319,12 @@ export default function EventsScreen({ onBack }: { onBack: () => void }) {
                 ? <p className="text-sm text-gray-400 text-center py-3">{tr.noEvents}</p>
                 : past.map(ev => <EventRow key={ev.id} ev={ev} selected={selectedIds.has(ev.id)} {...rowProps} />)
               }
+              {past.length > 3 && (
+                <button
+                  onClick={() => scrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' })}
+                  className="w-full py-2 text-xs font-bold text-blue-500 bg-blue-50 rounded-xl border border-blue-100 mt-1"
+                >↑ {tr.upcomingEventsLabel}</button>
+              )}
             </div>
           )}
         </div>

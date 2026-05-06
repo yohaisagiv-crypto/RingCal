@@ -424,7 +424,7 @@ ${overdueLines}`
             )}
           </div>
 
-          <p className="text-center text-[10px] text-gray-300 font-mono pb-2">RingCal · v1.0</p>
+          <p className="text-center text-[10px] text-gray-300 font-mono pb-2">RingCal · v1.1</p>
         </div>
       </div>
 

@@ -222,6 +222,7 @@ export async function initialSync(
     endTime?: string; note?: string; gcalId?: string; categoryId: string
   }>,
   blockedCategories: Set<string>,
+  deletedGcalIds: Set<string>,
   onImport: (ev: ReturnType<typeof fromGcalEvent>) => void,
   onExport: (localId: string, gcalId: string) => void,
 ): Promise<void> {
@@ -231,9 +232,9 @@ export async function initialSync(
   const gcalEvents = await fetchFutureEvents(since)
   const existingGcalIds = new Set(localFutureEvents.map(e => e.gcalId).filter(Boolean))
 
-  // Google → app
+  // Google → app (skip events we intentionally deleted locally)
   for (const ge of gcalEvents) {
-    if (!existingGcalIds.has(ge.id)) {
+    if (!existingGcalIds.has(ge.id) && !deletedGcalIds.has(ge.id)) {
       onImport(fromGcalEvent(ge))
     }
   }

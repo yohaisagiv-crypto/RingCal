@@ -23,6 +23,7 @@ const PRESET_ICONS = [
 
 export default function SettingsScreen({ onBack }: { onBack: () => void }) {
   const { settings, updateSettings, updateCriticalTime, categories, updateCategory,
+          deletedGcalIds,
           addCategory, deleteCategory, reorderCategory,
           events, gcalConnected, setGcalConnected, addEvent, patchEventGcalId,
           importData } = useAppStore()
@@ -98,6 +99,7 @@ export default function SettingsScreen({ onBack }: { onBack: () => void }) {
       await gcal.initialSync(
         localFuture,
         blocked,
+        new Set(deletedGcalIds),
         (imported) => addEvent({ ...imported, itemType: 'event', categoryId: categories[0]?.id ?? '', priority: 'N', done: false, links: [], files: [] }),
         (localId, gcalId) => patchEventGcalId(localId, gcalId),
       )

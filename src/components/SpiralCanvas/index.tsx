@@ -437,15 +437,18 @@ function drawWeekendShading(
       if (dow === 5 || dow === 6) shade(ang(d - 1, dim), ang(d, dim), dow === 6)
     }
   } else if (mode === 'year') {
+    // Alternating month shading — keeps the ring uniform like other modes
     for (let m = 0; m < 12; m++) {
-      const di = daysInMonth(year, m)
-      const ss = ang(m, 12); const sp = ang(m + 1, 12) - ss
-      for (let d = 1; d <= di; d++) {
-        const dow = new Date(year, m, d).getDay()
-        if (dow === 5 || dow === 6) {
-          const a1 = ss + ((d - 1) / di) * sp; const a2 = ss + (d / di) * sp
-          shade(a1, a2, dow === 6)
-        }
+      if (m % 2 === 1) {
+        const a1 = ang(m, 12); const a2 = ang(m + 1, 12)
+        ctx.save()
+        ctx.beginPath()
+        ctx.arc(CX, CY, R_OUT, a1, a2)
+        ctx.arc(CX, CY, R_IN, a2, a1, true)
+        ctx.closePath()
+        ctx.fillStyle = 'rgba(66,133,244,.13)'
+        ctx.fill()
+        ctx.restore()
       }
     }
   }
