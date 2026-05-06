@@ -253,6 +253,19 @@ export default function SettingsScreen({ onBack }: { onBack: () => void }) {
           )}
         </S>
 
+        {/* Appearance & Notifications */}
+        <S label={tr.appearanceSection}>
+          <Row icon="🌙" title={tr.darkMode} sub={tr.darkModeSub}
+            action={<Toggle on={!!settings.darkMode} />}
+            onPress={() => updateSettings({ darkMode: !settings.darkMode })} />
+          <Row icon="🔔" title={tr.notificationsEnabled} sub={tr.notificationsEnabledSub}
+            action={<Toggle on={!!settings.notificationsEnabled} />}
+            onPress={() => updateSettings({ notificationsEnabled: !settings.notificationsEnabled })} />
+          <Row icon="🔄" title={tr.autoSyncLabel} sub={tr.autoSyncSub}
+            action={<Toggle on={!!settings.autoSyncGcal} />}
+            onPress={() => updateSettings({ autoSyncGcal: !settings.autoSyncGcal })} last />
+        </S>
+
         {/* Display */}
         <S label={tr.display}>
           <Row icon="🔗" title={tr.depLinks} sub={tr.depLinksSub}
@@ -488,6 +501,14 @@ function CategoryEditor({
         </div>
       </div>
     </>
+  )
+}
+
+function Toggle({ on }: { on: boolean }) {
+  return (
+    <div className={`w-11 h-6 rounded-full flex items-center px-0.5 transition-colors flex-shrink-0 ${on ? 'bg-green-500' : 'bg-gray-300'}`}>
+      <div className={`w-5 h-5 rounded-full bg-white shadow transition-transform ${on ? 'translate-x-5' : 'translate-x-0'}`} />
+    </div>
   )
 }
 

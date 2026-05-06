@@ -107,6 +107,10 @@ const DEFAULT_SETTINGS: AppSettings = {
   showDepLinks: true,
   criticalTime: { day: 2, week: 2, month: 7, year: 2 },
   defaultMode: 'week',
+  darkMode: false,
+  notificationsEnabled: true,
+  notifyMinutesBefore: [60, 1440],
+  autoSyncGcal: true,
 }
 
 interface AppState {

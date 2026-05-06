@@ -69,4 +69,8 @@ export interface AppSettings {
   criticalTime: CriticalTime
   defaultMode: ViewMode
   geminiApiKey?: string
+  darkMode?: boolean
+  notificationsEnabled?: boolean
+  notifyMinutesBefore?: number[] // e.g. [10, 60, 1440]
+  autoSyncGcal?: boolean
 }

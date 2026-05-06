@@ -14,6 +14,10 @@ import { pullFromDrive, pushToDrive, getLocalSyncTs } from '../../services/googl
 import { localISODate } from '../../hooks/useSpiralMath'
 import type { CalendarEvent } from '../../types'
 import EventSheet from '../EventSheet'
+import { useDarkMode } from '../../hooks/useDarkMode'
+import * as notif from '../../services/notifications'
+import * as gcal from '../../services/googleCalendar'
+import StatsScreen from '../screens/StatsScreen'
 
 
 function timeRemainingRight(
@@ -60,10 +64,14 @@ export default function AppLayout() {
   const {
     bumpSpiralGeneration, subCalendarParentId, setSubCalendarParentId,
     events, categories, settings, mode, needle, gcalConnected, importData, updateSettings,
+    addEvent, patchEventGcalId, deletedGcalIds,
   } = useAppStore()
   const { tr, rtl } = useLang()
   const pendingCount = events.filter(e => e.rsvpStatus === 'pending').length
   const pushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const autoSyncRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  useDarkMode()
 
   // ── Desktop right panel state ──
   const [desktopSheetEvent, setDesktopSheetEvent] = useState<CalendarEvent | null>(null)
@@ -100,6 +108,39 @@ export default function AppLayout() {
     return () => { if (pushTimerRef.current) clearTimeout(pushTimerRef.current) }
   }, [events, categories, settings, gcalConnected])
 
+  // ── Local notifications — reschedule whenever events change ──
+  useEffect(() => {
+    if (!settings.notificationsEnabled) return
+    const mins = settings.notifyMinutesBefore ?? [60, 1440]
+    notif.requestPermission().then(granted => {
+      if (granted) notif.rescheduleAll(events, mins)
+    })
+  }, [events, settings.notificationsEnabled, settings.notifyMinutesBefore])
+
+  // ── Auto Google Calendar sync (every 15 min) ──
+  useEffect(() => {
+    if (!gcalConnected || !settings.autoSyncGcal || !gcal.isConnected()) return
+    const doSync = async () => {
+      try {
+        const since = new Date(); since.setFullYear(since.getFullYear() - 1)
+        const gcalEvents = await gcal.fetchFutureEvents(since)
+        const state = useAppStore.getState()
+        const existingIds = new Set(state.events.map(e => e.gcalId).filter(Boolean))
+        const deletedIds = new Set(state.deletedGcalIds)
+        const cat0 = state.categories[0]?.id ?? ''
+        for (const ge of gcalEvents) {
+          if (existingIds.has(ge.id) || deletedIds.has(ge.id)) continue
+          const imported = gcal.fromGcalEvent(ge)
+          const newId = addEvent({ ...imported, itemType: 'event', categoryId: cat0, priority: 'N', done: false, links: [], files: [] })
+          patchEventGcalId(newId, ge.id)
+        }
+      } catch { /* silent background sync */ }
+    }
+    doSync()
+    autoSyncRef.current = setInterval(doSync, 15 * 60 * 1000)
+    return () => { if (autoSyncRef.current) clearInterval(autoSyncRef.current) }
+  }, [gcalConnected, settings.autoSyncGcal])
+
   // ── Android back button ──
   useEffect(() => {
     let handler: { remove: () => void } | null = null
@@ -131,6 +172,7 @@ export default function AppLayout() {
     { id: 'calendar', icon: '🔵', label: tr.tabCalendar },
     { id: 'events',   icon: '📋', label: tr.tabEvents },
     { id: 'tasks',    icon: '✅', label: tr.tabTasks },
+    { id: 'stats',    icon: '📊', label: tr.statsScreen },
     { id: 'menu',     icon: '?',  label: tr.tabMenu },
     { id: 'settings', icon: '⚙️', label: tr.tabSettings },
   ]
@@ -255,12 +297,15 @@ export default function AppLayout() {
             <TasksScreen onBack={() => navigateTo(0)} />
           </div>
           <div className={`absolute inset-0 transition-transform duration-300 ease-out ${offset(3)}`}>
-            <MainMenuScreen onNavigate={navigateTo} />
+            <StatsScreen onBack={() => navigateTo(0)} />
           </div>
           <div className={`absolute inset-0 transition-transform duration-300 ease-out ${offset(4)}`}>
-            <SettingsScreen onBack={() => navigateTo(0)} />
+            <MainMenuScreen onNavigate={navigateTo} />
           </div>
           <div className={`absolute inset-0 transition-transform duration-300 ease-out ${offset(5)}`}>
+            <SettingsScreen onBack={() => navigateTo(0)} />
+          </div>
+          <div className={`absolute inset-0 transition-transform duration-300 ease-out ${offset(6)}`}>
             <AIScreen onBack={() => navigateTo(0)} />
           </div>
 

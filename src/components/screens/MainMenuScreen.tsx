@@ -146,7 +146,8 @@ ${overdueLines}`
     { icon: '🔵', label: tr.tabCalendar, page: 0 },
     { icon: '📋', label: tr.tabEvents,   page: 1 },
     { icon: '✅', label: tr.tabTasks,    page: 2 },
-    { icon: '⚙️', label: tr.settings,   page: 4 },
+    { icon: '📊', label: tr.statsScreen, page: 3 },
+    { icon: '⚙️', label: tr.settings,   page: 5 },
   ]
 
   return (
@@ -214,7 +215,7 @@ ${overdueLines}`
             </span>
             {!gcalConnected && (
               <button
-                onClick={() => onNavigate(4)}
+                onClick={() => onNavigate(5)}
                 className="text-xs font-bold text-blue-500 bg-blue-50 px-3 py-1.5 rounded-lg border border-blue-200"
               >
                 {tr.gcalConnectBtn}
@@ -424,7 +425,7 @@ ${overdueLines}`
             )}
           </div>
 
-          <p className="text-center text-[10px] text-gray-300 font-mono pb-2">RingCal · v1.1</p>
+          <p className="text-center text-[10px] text-gray-300 font-mono pb-2">RingCal · v1.2</p>
         </div>
       </div>
 

@@ -94,7 +94,7 @@ export default function SpiralScreen({ onNavigate, filterCats = [], filterType =
           <span className="text-white/70 text-base">›</span>
         </button>
       )}
-      <CategoryStrip onParams={() => onNavigate(4)} filterCat={filterCat} onFilter={handleFilterCat} />
+      <CategoryStrip onParams={() => onNavigate(5)} filterCat={filterCat} onFilter={handleFilterCat} />
       <div className="lg:hidden">
         <UpcomingStrip onTap={(ev) => { setSheetEvent(ev); setAddDate(null) }} eventsOverride={filteredEventsOverride} />
       </div>

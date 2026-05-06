@@ -2,6 +2,9 @@
 @import "tailwindcss";
 @plugin "@tailwindcss/typography";
 
+/* Dark mode via .dark class on <html> */
+@variant dark (&:where(.dark, .dark *));
+
 @theme {
   --font-sans: "Manrope", ui-sans-serif, system-ui, sans-serif;
 }
