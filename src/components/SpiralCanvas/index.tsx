@@ -437,7 +437,7 @@ function drawWeekendShading(
       if (dow === 5 || dow === 6) shade(ang(d - 1, dim), ang(d, dim), dow === 6)
     }
   } else if (mode === 'year') {
-    // Alternating month shading — keeps the ring uniform like other modes
+    // Alternating month shading — same teal as Friday shading in other modes
     for (let m = 0; m < 12; m++) {
       if (m % 2 === 1) {
         const a1 = ang(m, 12); const a2 = ang(m + 1, 12)
@@ -446,7 +446,7 @@ function drawWeekendShading(
         ctx.arc(CX, CY, R_OUT, a1, a2)
         ctx.arc(CX, CY, R_IN, a2, a1, true)
         ctx.closePath()
-        ctx.fillStyle = 'rgba(66,133,244,.13)'
+        ctx.fillStyle = 'rgba(0,180,180,.25)'
         ctx.fill()
         ctx.restore()
       }

@@ -1,6 +1,14 @@
 import { create } from 'zustand'
-import { persist } from 'zustand/middleware'
+import { persist, createJSONStorage } from 'zustand/middleware'
+import { get, set as idbSet, del } from 'idb-keyval'
 import type { CalendarEvent, Category, AppSettings, ViewMode, CriticalTime, RecurrenceRule } from '../types'
+
+// IndexedDB storage adapter — survives "Clear cache" (only "Clear data" erases it)
+const idbStorage = {
+  getItem: async (name: string) => (await get(name)) ?? null,
+  setItem: async (name: string, value: string) => { await idbSet(name, value) },
+  removeItem: async (name: string) => { await del(name) },
+}
 
 function computeRollupDays(parentId: string, events: CalendarEvent[]): number {
   const children = events.filter(e => e.parentId === parentId && !e.done)
@@ -290,6 +298,7 @@ export const useAppStore = create<AppState>()(
     }),
     {
       name: 'spiral-diary',
+      storage: createJSONStorage(() => idbStorage),
       partialize: (s) => ({
         events: s.events,
         categories: s.categories,
